@@ -1,69 +1,79 @@
 ---
 name: flow-prompt-studio
 description: >-
-  Senaryodan Google Flow / Veo AI görüntü ve video üretim prompt paketi oluşturur.
-  Kullanıcı senaryo PDF/MD/TXT verir; karakter, mekan, prop analizi, görsel stil tespiti,
-  kamera coverage planı, shot planı, asset planı, repair promptları, copy-ready Flow blokları
-  ve tüm export formatlarını üretir. Image-first kredi koruma stratejisiyle çalışır.
+  Generates Google Flow / Veo AI image and video production prompt packs from screenplays.
+  User provides a screenplay PDF/MD/TXT; the tool produces character, location, and prop analysis,
+  visual style detection, camera coverage plan, shot plan, asset plan, repair prompts, copy-ready
+  Flow blocks, and all export formats. Works with an image-first credit preservation strategy.
 ---
 
 # Flow Prompt Studio Skill
 
-Sen bir AI film prodüksiyon asistanısın. Flow Prompt Studio aracını kullanarak kullanıcının senaryosundan Google Flow / Veo için profesyonel prompt paketi üretebilirsin.
+You are an AI film production assistant. Use the Flow Prompt Studio tool to generate professional prompt packs for Google Flow / Veo from the user's screenplay.
 
-## Backend Gereksinimi
+## Backend Requirement
 
-Bu skill'in çalışması için Flow Prompt Studio backend'inin çalışıyor olması gerekir.
-Varsayılan: `http://localhost:8000`
+This skill requires the Flow Prompt Studio backend to be running.
+Default: `http://localhost:8000`
 
-Backend'i başlatmak için:
+To start the backend:
 ```bash
-cd flow-frompt-studio
-.venv\Scripts\python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+cd flow-prompt-studio
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## CLI Komutları
+## CLI Commands
 
-Kurulum: `npm install -g flow-prompt-studio`
+Installation: `npm install -g flow-prompt-studio`
 
 ```bash
-# Yapılandırma kontrolü
+# Check configuration and backend status
 fps config
 
-# Senaryo yükle
-fps upload senaryo.pdf
+# System health check
+fps doctor
 
-# Karakter, mekan, prop analizi
+# Initialize project config
+fps init
+
+# Upload screenplay
+fps upload screenplay.pdf
+
+# Estimate before running (dry-run)
+fps estimate screenplay.pdf
+
+# Character, location, prop analysis
 fps analyze
 
-# Görsel stil tespiti (DeepSeek AI veya fallback)
+# Visual style detection (DeepSeek AI or fallback)
 fps style
 
-# AI prompt paketi üret
+# Generate AI prompt pack
 fps generate --scope full_pack
 fps generate --scope scene_breakdown
 fps generate --ultra
 
-# Kamera coverage ve shot planı
+# Camera coverage and shot plan
 fps coverage
 
-# Onarım promptları
-fps repair                                  # Hata türlerini listele
-fps repair "Karakter yüzü değişti" --scene SCENE_01A
-fps repair --all                            # Tüm 20 hata türü için
+# Repair prompts
+fps repair                                   # List error types
+fps repair "Character face changed" --scene SCENE_01A
+fps repair --all                             # All 20 error types
 
-# Doğrulama
+# Validate
 fps validate
 
-# Dışa aktar
-fps export                                  # Formatları listele
+# Export
+fps export                                   # List formats
 fps export markdown
 fps export production-pack-zip
 
-# TAM OTOMATİK WORKFLOW
-fps workflow senaryo.pdf                    # Tüm adımları çalıştır
-fps workflow senaryo.pdf --ultra            # Ultra mod
-fps workflow senaryo.pdf --no-generate      # AI üretimi olmadan
+# FULL AUTOMATED WORKFLOW
+fps workflow screenplay.pdf                  # Run all steps
+fps workflow screenplay.pdf --ultra          # Ultra mode
+fps workflow screenplay.pdf --dry-run        # Estimate first
+fps workflow screenplay.pdf --no-generate    # Skip AI generation
 ```
 
 ## Programmatic API (Node.js)
@@ -72,30 +82,37 @@ fps workflow senaryo.pdf --no-generate      # AI üretimi olmadan
 const { FlowPromptStudio } = require('flow-prompt-studio');
 const fps = new FlowPromptStudio('http://localhost:8000/api/v1');
 
-// Tam otomatik workflow
-const result = await fps.workflow('senaryo.pdf', { ultra: true });
+// Check backend health
+const { reachable } = await fps.ping();
 
-console.log(result.analysis.characters);  // Karakter listesi
-console.log(result.bundle.shot_rows);     // Shot planı
-console.log(result.exports.markdown);     // Export URL'leri
+// Estimate without uploading
+const est = await fps.estimate('screenplay.pdf');
+console.log(`${est.estimatedShots} shots expected`);
+
+// Full automated workflow
+const result = await fps.workflow('screenplay.pdf', { ultra: true });
+
+console.log(result.analysis.characters);  // Character list
+console.log(result.bundle.shot_rows);     // Shot plan
+console.log(result.exports.markdown);     // Export URLs
 ```
 
-## Workflow Adımları
+## Workflow Steps
 
-Bu skill ile aşağıdaki iş akışını otomatik çalıştırabilirsin:
+This skill automates the following workflow:
 
-1. **Senaryo Yükleme** — PDF, MD, TXT, DOCX formatları
-2. **Karakter/Mekan/Prop Analizi** — Regex + NLP bazlı çıkarım
-3. **Görsel Stil Tespiti** — DeepSeek AI ile otomatik stil analizi
-4. **Kamera Coverage Planı** — 11 shot türü, her sahne için detaylı plan
-5. **AI Prompt Paketi Üretimi** — DeepSeek ile 13 bölümlü Markdown paket
-6. **Doğrulama** — 20+ kural ile paket kontrolü
-7. **Dışa Aktarma** — 14 format (MD, TXT, CSV, JSON, ZIP)
+1. **Screenplay Upload** — PDF, MD, TXT, DOCX formats
+2. **Character/Location/Prop Analysis** — Regex + NLP-based extraction
+3. **Visual Style Detection** — DeepSeek AI auto style analysis
+4. **Camera Coverage Plan** — 11 shot types, detailed plan per scene
+5. **AI Prompt Pack Generation** — DeepSeek-generated 13-section Markdown pack
+6. **Validation** — 20+ rules for package integrity
+7. **Export** — 14 formats (MD, TXT, CSV, JSON, ZIP)
 
-## Kullanıcıya Öneri
+## User Recommendations
 
-İşlem tamamlandıktan sonra kullanıcıya şunları söyle:
-- Hangi karakterler, mekanlar ve proplar tespit edildi
-- Kaç sahne ve shot planlandı
-- Hangi export dosyalarının oluşturulduğu
-- Bir sonraki adım: Flow'da asset koleksiyonlarını oluşturup görsel batch üretimine başlaması
+After completion, inform the user:
+- Which characters, locations, and props were detected
+- How many scenes and shots were planned
+- Which export files were created
+- Next step: create asset collections in Flow and begin visual batch production

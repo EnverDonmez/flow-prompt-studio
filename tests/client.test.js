@@ -1,11 +1,14 @@
 /**
- * Flow Prompt Studio — Client birim testleri
+ * Flow Prompt Studio — Client unit tests
  *
- * Çalıştırma: node --test tests/client.test.js
+ * Usage: node --test tests/client.test.js
  */
 
 const { describe, it, after, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 
 // Mock fetch
 let originalFetch;
@@ -36,7 +39,7 @@ function mockFetch(responseFactory) {
 }
 
 function setupFetch(responseFactory) {
-  mockFetchCalls.length = 0; // önceki test kalıntılarını temizle
+  mockFetchCalls.length = 0;
   originalFetch = globalThis.fetch;
   globalThis.fetch = mockFetch(responseFactory);
 }
@@ -75,7 +78,7 @@ describe("FlowPromptStudioClient", () => {
 
   /* ── _request ── */
   describe("_request", () => {
-    it("başarılı JSON yanıtı parse eder", async () => {
+    it("parses successful JSON response", async () => {
       const client = makeClient();
       setupFetch({ body: { success: true, data: "test" } });
       const result = await client._request("/test");
@@ -83,35 +86,35 @@ describe("FlowPromptStudioClient", () => {
       assert.equal(result.data, "test");
     });
 
-    it("başarılı text yanıtı döner", async () => {
+    it("returns text response", async () => {
       const client = makeClient();
-      setupFetch({ contentType: "text/plain", body: null, textBody: "merhaba" });
+      setupFetch({ contentType: "text/plain", body: null, textBody: "hello" });
       const result = await client._request("/test");
-      assert.equal(result, "merhaba");
+      assert.equal(result, "hello");
     });
 
-    it("HTTP hatasını throw eder", async () => {
+    it("throws on HTTP error", async () => {
       const client = makeClient();
-      setupFetch({ ok: false, status: 500, textBody: "Sunucu hatası" });
+      setupFetch({ ok: false, status: 500, textBody: "Server error" });
       await assert.rejects(
         () => client._request("/test"),
-        /API 500: Sunucu hatası/
+        /API 500: Server error/
       );
     });
 
-    it("404 hatası doğru mesajla throw eder", async () => {
+    it("throws with correct message for 404", async () => {
       const client = makeClient();
-      setupFetch({ ok: false, status: 404, textBody: "Bulunamadı" });
+      setupFetch({ ok: false, status: 404, textBody: "Not found" });
       await assert.rejects(
         () => client._request("/test"),
-        /API 404: Bulunamadı/
+        /API 404: Not found/
       );
     });
   });
 
-  /* ── Retry ── */
-  describe("retry mekanizması", () => {
-    it("retryable statüde tekrar dener ve başarılı olur", async () => {
+  /* ── Retry mechanism ── */
+  describe("retry mechanism", () => {
+    it("retries on retryable status and succeeds on 3rd attempt", async () => {
       const client = makeClient({
         maxRetries: 2,
         initialDelayMs: 5,
@@ -131,7 +134,7 @@ describe("FlowPromptStudioClient", () => {
             status: 503,
             statusText: "Service Unavailable",
             headers: { get: () => null },
-            text: async () => "geçici hata",
+            text: async () => "temporary error",
           };
         }
         return {
@@ -148,7 +151,7 @@ describe("FlowPromptStudioClient", () => {
       assert.equal(callCount, 3);
     });
 
-    it("tüm denemeler tükenince en son hatayı throw eder", async () => {
+    it("throws aggregate error after all retries exhausted", async () => {
       const client = makeClient({
         maxRetries: 2,
         initialDelayMs: 5,
@@ -162,14 +165,14 @@ describe("FlowPromptStudioClient", () => {
 
       await assert.rejects(
         () => client._request("/fail"),
-        /deneme sonrası başarısız: API 502: Bad Gateway/
+        /Failed after 3 attempts: API 502: Bad Gateway/
       );
     });
   });
 
-  /* ── API metodları ── */
-  describe("screenplay metodları", () => {
-    it("getAnalysis doğru endpoint'e istek atar", async () => {
+  /* ── API methods ── */
+  describe("screenplay methods", () => {
+    it("getAnalysis calls correct endpoint", async () => {
       const client = makeClient();
       setupFetch({ body: { characters: [], locations: [], props: [] } });
       const result = await client.getAnalysis();
@@ -177,7 +180,7 @@ describe("FlowPromptStudioClient", () => {
       assert.equal(mockFetchCalls[0].url, "http://test.local/api/v1/screenplay/analysis");
     });
 
-    it("getStats doğru endpoint'e istek atar", async () => {
+    it("getStats calls correct endpoint", async () => {
       const client = makeClient();
       setupFetch({ body: { scene_count: 5, char_count: 100, estimated_segments: 20 } });
       const result = await client.getStats();
@@ -186,8 +189,8 @@ describe("FlowPromptStudioClient", () => {
     });
   });
 
-  describe("style metodları", () => {
-    it("detectStyle POST isteği atar", async () => {
+  describe("style methods", () => {
+    it("detectStyle sends POST request", async () => {
       const client = makeClient();
       setupFetch({ body: { detected: true, mode: "AI", settings: {} } });
       const result = await client.detectStyle();
@@ -195,7 +198,7 @@ describe("FlowPromptStudioClient", () => {
       assert.equal(mockFetchCalls[0].options.method, "POST");
     });
 
-    it("getStyle mevcut ayarları döner", async () => {
+    it("getStyle returns current settings", async () => {
       const client = makeClient();
       setupFetch({ body: { visual_style: "dark", camera_language: "cinematic" } });
       const result = await client.getStyle();
@@ -203,8 +206,8 @@ describe("FlowPromptStudioClient", () => {
     });
   });
 
-  describe("generation metodları", () => {
-    it("generate varsayılan scope ile çalışır", async () => {
+  describe("generation methods", () => {
+    it("generate uses default scope", async () => {
       const client = makeClient();
       setupFetch({ body: { success: true, model_used: "test-model" } });
       const result = await client.generate();
@@ -214,7 +217,7 @@ describe("FlowPromptStudioClient", () => {
       assert.equal(body.force_ultra, false);
     });
 
-    it("generate ultra modda çalışır", async () => {
+    it("generate passes ultra flag", async () => {
       const client = makeClient();
       setupFetch({ body: { success: true } });
       await client.generate("full_pack", true);
@@ -223,8 +226,8 @@ describe("FlowPromptStudioClient", () => {
     });
   });
 
-  describe("validation metodları", () => {
-    it("validate markdown metni gönderir", async () => {
+  describe("validation methods", () => {
+    it("validate sends markdown text", async () => {
       const client = makeClient();
       setupFetch({ body: { issues: [], summary: { critical: 0, warning: 0, info: 0 } } });
       const result = await client.validate("test markdown");
@@ -235,24 +238,97 @@ describe("FlowPromptStudioClient", () => {
   });
 
   describe("export", () => {
-    it("getExportUrl doğru URL üretir", () => {
+    it("getExportUrl produces correct URL", () => {
       const client = makeClient();
       const url = client.getExportUrl("markdown");
       assert.equal(url, "http://test.local/api/v1/export/markdown");
     });
   });
 
-  describe("repair metodları", () => {
-    it("generateRepair parametreleri doğru gönderir", async () => {
+  describe("repair methods", () => {
+    it("generateRepair sends all parameters correctly", async () => {
       const client = makeClient();
       setupFetch({ body: { repair: { flow_agent_prompt: "fix..." } } });
-      const result = await client.generateRepair("color_error", "SCENE_01A", "seg1", "renk bozuk");
+      const result = await client.generateRepair("color_error", "SCENE_01A", "seg1", "bad color");
       assert.ok(result.repair);
       const body = JSON.parse(mockFetchCalls[0].options.body);
       assert.equal(body.error_type, "color_error");
       assert.equal(body.scene_id, "SCENE_01A");
       assert.equal(body.segment_id, "seg1");
-      assert.equal(body.problem_description, "renk bozuk");
+      assert.equal(body.problem_description, "bad color");
+    });
+  });
+
+  /* ── ping ── */
+  describe("ping", () => {
+    it("returns reachable true when backend responds", async () => {
+      const client = makeClient();
+      setupFetch({ body: { has_api_key: true, fast_model: "test" } });
+      const result = await client.ping();
+      assert.equal(result.reachable, true);
+    });
+
+    it("returns reachable false when backend is down", async () => {
+      // Simulate connection refused
+      const client = makeClient();
+      globalThis.fetch = async () => {
+        throw new Error("ECONNREFUSED");
+      };
+      const result = await client.ping();
+      assert.equal(result.reachable, false);
+      assert.ok(result.error);
+    });
+  });
+
+  /* ── estimate ── */
+  describe("estimate", () => {
+    it("estimates shots from a screenplay file", async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "fps-test-"));
+      const tmpFile = path.join(tmpDir, "script.txt");
+      // File with scene markers
+      const content = "SCENE 1\nContent here\nSCENE 2\nMore content\nSCENE: 3\nEven more";
+      fs.writeFileSync(tmpFile, content, "utf-8");
+
+      try {
+        const client = makeClient();
+        const est = await client.estimate(tmpFile);
+        assert.equal(est.filename, "script.txt");
+        assert.ok(est.fileSizeKb >= 0);
+        assert.ok(est.estimatedScenes >= 1);
+        assert.ok(est.estimatedShots >= 1);
+        assert.ok(est.estimatedDurationMinutes >= 0);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it("throws for missing file", async () => {
+      const client = makeClient();
+      await assert.rejects(
+        () => client.estimate("/nonexistent/file.pdf"),
+        /File not found/
+      );
+    });
+  });
+
+  /* ── cache ── */
+  describe("cache", () => {
+    it("caches GET responses and returns cached data on second call", async () => {
+      const client = makeClient();
+      setupFetch({ body: { cached: true } });
+
+      // First call — should hit fetch
+      await client._request("/cache-test");
+      assert.equal(mockFetchCalls.length, 1);
+
+      // Second call — should return from cache (same URL, GET)
+      await client._request("/cache-test");
+      assert.equal(mockFetchCalls.length, 1, "second call should use cache, not fetch again");
+
+      // After clearing cache, should fetch again
+      client.clearCache();
+      await client._request("/cache-test");
+      assert.equal(mockFetchCalls.length, 2, "after clearing cache, should fetch again");
     });
   });
 });

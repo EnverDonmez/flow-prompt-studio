@@ -70,7 +70,8 @@ export interface BundleResult {
 }
 
 export interface ShotRow {
-  "Shot Türü": string;
+  "Shot Type"?: string;
+  "Shot Türü"?: string;
   [key: string]: any;
 }
 
@@ -144,17 +145,32 @@ export interface MarkdownResult {
   [key: string]: any;
 }
 
+export interface PingResult {
+  reachable: boolean;
+  error?: string;
+}
+
+export interface EstimateResult {
+  filename: string;
+  fileSizeKb: number;
+  estimatedScenes: number;
+  estimatedShots: number;
+  estimatedDurationMinutes: number;
+}
+
 /* ─── Workflow Options ─── */
 
 export interface WorkflowOptions {
-  /** Üretim kapsamı (default: "full_pack") */
+  /** Generation scope (default: "full_pack") */
   scope?: string;
-  /** Ultra görsel varyasyon modu (default: false) */
+  /** Ultra image variation mode (default: false) */
   ultra?: boolean;
-  /** AI üretimi adımı çalışsın mı (default: true) */
+  /** Run AI generation step (default: true) */
   generate?: boolean;
-  /** Dışa aktarma formatları */
+  /** Export formats */
   exportFormats?: string[];
+  /** Progress callback */
+  onProgress?: (step: string, message: string) => void;
 }
 
 export interface WorkflowResult {
@@ -174,22 +190,24 @@ export interface ClientRequestOptions {
   headers?: Record<string, string>;
   body?: any;
   method?: string;
+  signal?: AbortSignal;
+  _skipCache?: boolean;
 }
 
 /* ─── Retry / Error ─── */
 
 export interface RetryConfig {
-  /** Maksimum deneme sayısı (default: 3) */
+  /** Maximum retry attempts (default: 3) */
   maxRetries: number;
-  /** İlk denemede bekleme süresi ms (default: 1000) */
+  /** Initial delay in ms (default: 1000) */
   initialDelayMs: number;
-  /** Her denemede katlanarak artan bekleme çarpanı (default: 2) */
+  /** Exponential backoff multiplier (default: 2) */
   backoffMultiplier: number;
-  /** Maksimum bekleme süresi ms (default: 30000) */
+  /** Maximum delay in ms (default: 30000) */
   maxDelayMs: number;
-  /** İstek timeout ms (default: 60000) */
+  /** Request timeout in ms (default: 60000) */
   timeoutMs: number;
-  /** Hangi HTTP durum kodlarında retry yapılsın (default: [429, 502, 503, 504]) */
+  /** HTTP status codes that trigger a retry (default: [429, 502, 503, 504]) */
   retryableStatuses: number[];
 }
 
@@ -201,7 +219,16 @@ export class FlowPromptStudioClient {
   baseUrl: string;
   retryConfig: RetryConfig;
 
-  /** Özel istek atma metodu — retry ve timeout uygular */
+  /** Check if backend is reachable */
+  ping(): Promise<PingResult>;
+
+  /** Estimate shot count and duration from a screenplay file (local, no upload) */
+  estimate(filePath: string): Promise<EstimateResult>;
+
+  /** Clear the in-memory request cache */
+  clearCache(): void;
+
+  /** Core HTTP request with retry and timeout */
   _request(path: string, options?: ClientRequestOptions): Promise<any>;
 
   /* Session */
@@ -267,10 +294,19 @@ export class FlowPromptStudio {
   client: FlowPromptStudioClient;
   readonly version: string;
 
-  /** Tam otomatik 7 adımlı workflow */
+  /** Check if backend is reachable */
+  ping(): Promise<PingResult>;
+
+  /** Full automated 7-step workflow */
   workflow(screenplayPath: string, options?: WorkflowOptions): Promise<WorkflowResult>;
 
-  /* Bireysel API wrapper'ları */
+  /** Workflow with built-in CLI spinner */
+  workflowProgressive(screenplayPath: string, options?: WorkflowOptions): Promise<WorkflowResult>;
+
+  /** Estimate shots/duration without uploading (dry-run) */
+  estimate(filePath: string): Promise<EstimateResult>;
+
+  /* Individual API wrappers */
   upload(filePath: string): Promise<UploadResult>;
   analyze(): Promise<{ analysis: AnalysisResult; stats: StatsResult }>;
   detectStyle(): Promise<StyleDetectionResult>;

@@ -1,7 +1,6 @@
 /**
  * Flow Prompt Studio — API Client
- * Backend API ile haberleşme katmanı.
- * Retry, timeout ve exponential backoff desteği.
+ * Backend communication layer with retry, timeout, and exponential backoff.
  */
 
 const fs = require("fs");
@@ -9,7 +8,7 @@ const path = require("path");
 
 const API_BASE = process.env.FPS_API_URL || "http://localhost:8000/api/v1";
 
-/** Varsayılan retry yapılandırması */
+/** Default retry configuration */
 const DEFAULT_RETRY_CONFIG = {
   maxRetries: 3,
   initialDelayMs: 1000,
@@ -23,17 +22,20 @@ class FlowPromptStudioClient {
   constructor(baseUrl = API_BASE) {
     this.baseUrl = baseUrl;
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG };
+    /** Simple in-memory cache for GET requests */
+    this._cache = new Map();
+    this._cacheTtl = 60_000; // 1 minute default
   }
 
   /**
-   * Retry'lanabilir hata mı kontrolü.
-   * Ağ hataları ve belirli HTTP durum kodları retry'lanır.
+   * Check whether an error is retryable.
+   * Network errors and specific HTTP status codes are retryable.
    */
   _isRetryable(error, status) {
     if (status && this.retryConfig.retryableStatuses.includes(status)) {
       return true;
     }
-    // Ağ hataları (fetch failed, DNS, connection refused vs.)
+    // Network errors (fetch failed, DNS, connection refused, etc.)
     if (!status && error) {
       const msg = error.message || "";
       if (
@@ -51,41 +53,60 @@ class FlowPromptStudioClient {
     return false;
   }
 
-  /**
-   * Belirtilen ms kadar bekle.
-   */
+  /** Sleep for given milliseconds */
   _sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Retry-After header'ından bekleme süresi çıkar.
-   */
+  /** Extract wait duration from Retry-After header */
   _parseRetryAfter(headers) {
     const raw = headers.get("retry-after");
     if (!raw) return null;
-    // Saniye cinsinden (örn: "120")
+    // Seconds (e.g. "120")
     const seconds = parseInt(raw, 10);
     if (!isNaN(seconds)) return seconds * 1000;
-    // HTTP-date formatı (örn: "Wed, 21 Oct 2015 07:28:00 GMT")
+    // HTTP-date format (e.g. "Wed, 21 Oct 2015 07:28:00 GMT")
     const date = new Date(raw);
     if (!isNaN(date.getTime())) return Math.max(0, date.getTime() - Date.now());
     return null;
   }
 
   /**
-   * Core HTTP istek metodu — retry, timeout ve hata yönetimi ile.
+   * Check whether the backend is reachable.
+   * @returns {Promise<{reachable: boolean, error?: string}>}
+   */
+  async ping() {
+    try {
+      const res = await this._request("/config", { _skipCache: true });
+      return { reachable: true };
+    } catch (err) {
+      return { reachable: false, error: err.message };
+    }
+  }
+
+  /**
+   * Core HTTP request method — with retry, timeout, and error handling.
    *
-   * @param {string} path - API endpoint yolu (örn: "/session")
-   * @param {object} options - Fetch seçenekleri
-   * @returns {Promise<any>} JSON, text veya blob yanıt
+   * @param {string} path - API endpoint path (e.g. "/session")
+   * @param {object} options - Fetch options
+   * @returns {Promise<any>} JSON, text, or blob response
    */
   async _request(path, options = {}) {
     const url = `${this.baseUrl}${path}`;
     const headers = { ...options.headers };
     const { retryConfig } = this;
+    const skipCache = options._skipCache;
 
-    // Content-Type: FormData için fetch boundary'yi kendi ekler
+    // Check cache for GET requests
+    const method = options.method || "GET";
+    if (method === "GET" && !skipCache) {
+      const cached = this._cache.get(url);
+      if (cached && Date.now() - cached.timestamp < this._cacheTtl) {
+        return cached.data;
+      }
+    }
+
+    // Content-Type: let fetch set boundary for FormData
     if (!(options.body instanceof FormData)) {
       headers["Content-Type"] = "application/json";
     }
@@ -97,13 +118,12 @@ class FlowPromptStudioClient {
       attempt++;
 
       try {
-        // Timeout kontrolü
+        // Timeout control
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), retryConfig.timeoutMs);
 
         const signal = options.signal
-          ? // İki sinyali birleştir: bizim timeout + dışarıdan gelen
-            AbortSignal.any([controller.signal, options.signal])
+          ? AbortSignal.any([controller.signal, options.signal])
           : controller.signal;
 
         const res = await fetch(url, {
@@ -114,22 +134,28 @@ class FlowPromptStudioClient {
 
         clearTimeout(timeoutId);
 
-        // 2xx → başarılı
+        // 2xx → success
         if (res.ok) {
           const ct = res.headers.get("content-type") || "";
-          if (ct.includes("application/json")) return res.json();
-          if (ct.includes("text")) return res.text();
-          return res.blob();
+          let result;
+          if (ct.includes("application/json")) result = await res.json();
+          else if (ct.includes("text")) result = await res.text();
+          else result = await res.blob();
+
+          // Cache GET results
+          if (method === "GET") {
+            this._cache.set(url, { data: result, timestamp: Date.now() });
+          }
+          return result;
         }
 
-        // Başarısız yanıt
+        // Failed response
         const errBody = await res.text().catch(() => res.statusText);
         const err = new Error(`API ${res.status}: ${errBody}`);
         err.status = res.status;
 
-        // Retry'lanabilir mi?
+        // Retryable?
         if (this._isRetryable(null, res.status) && attempt <= retryConfig.maxRetries) {
-          // Retry-After header'ına saygı göster
           const retryAfterMs = this._parseRetryAfter(res.headers);
           const delay = retryAfterMs != null
             ? Math.min(retryAfterMs, retryConfig.maxDelayMs)
@@ -139,38 +165,45 @@ class FlowPromptStudioClient {
               );
 
           console.warn(
-            `[fps] ${res.status} yanıtı, ${attempt}/${retryConfig.maxRetries} deneme — ${delay}ms bekleniyor...`
+            `[fps] HTTP ${res.status}, attempt ${attempt}/${retryConfig.maxRetries + 1} — waiting ${delay}ms...`
           );
           await this._sleep(delay);
           lastError = err;
           continue;
         }
 
-        // Retry hakkı kalmadıysa veya retry'lanamaz statü ise
         lastError = err;
         break;
 
       } catch (fetchErr) {
-        clearTimeout(undefined); // safe no-op if timeoutId out of scope
-
-        // Timeout'tan gelen AbortError
+        // Timeout AbortError
         if (fetchErr.name === "AbortError" && !options.signal?.aborted) {
-          fetchErr = new Error(`İstek timeout: ${retryConfig.timeoutMs}ms`);
+          fetchErr = new Error(`Request timed out after ${retryConfig.timeoutMs}ms`);
           fetchErr.status = 0;
         }
 
-        // Retry'lanabilir ağ hatası mı?
+        // Retryable network error?
         if (this._isRetryable(fetchErr, fetchErr.status || 0) && attempt <= retryConfig.maxRetries) {
           const delay = Math.min(
             retryConfig.initialDelayMs * Math.pow(retryConfig.backoffMultiplier, attempt - 1),
             retryConfig.maxDelayMs
           );
           console.warn(
-            `[fps] Ağ hatası (${fetchErr.message}), ${attempt}/${retryConfig.maxRetries} deneme — ${delay}ms bekleniyor...`
+            `[fps] Network error (${fetchErr.message}), attempt ${attempt}/${retryConfig.maxRetries + 1} — waiting ${delay}ms...`
           );
           await this._sleep(delay);
           lastError = fetchErr;
           continue;
+        }
+
+        // Wrap connection errors with helpful messages
+        if (fetchErr.message?.includes("ECONNREFUSED") || fetchErr.message?.includes("fetch failed")) {
+          const helpful = new Error(
+            `Cannot connect to Flow Prompt Studio backend at ${this.baseUrl}\n` +
+            `  Make sure the backend is running. Check with: fps config`
+          );
+          helpful.status = 0;
+          throw helpful;
         }
 
         lastError = fetchErr;
@@ -178,10 +211,15 @@ class FlowPromptStudioClient {
       }
     }
 
-    // Tüm denemeler tükendi
+    // All attempts exhausted
     throw new Error(
-      `${retryConfig.maxRetries + 1} deneme sonrası başarısız: ${lastError?.message || "Bilinmeyen hata"}`
+      `Failed after ${retryConfig.maxRetries + 1} attempts: ${lastError?.message || "Unknown error"}`
     );
+  }
+
+  /** Clear the in-memory cache */
+  clearCache() {
+    this._cache.clear();
   }
 
   /* ── Session ── */
@@ -190,6 +228,9 @@ class FlowPromptStudioClient {
 
   /* ── Screenplay ── */
   async uploadScreenplay(filePath) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
     const fileBuffer = fs.readFileSync(filePath);
     const blob = new Blob([fileBuffer], { type: "application/octet-stream" });
     const fd = new FormData();
@@ -203,7 +244,7 @@ class FlowPromptStudioClient {
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => res.statusText);
-      throw new Error(`API ${res.status}: ${errBody}`);
+      throw new Error(`Upload failed (HTTP ${res.status}): ${errBody}`);
     }
 
     return res.json();
@@ -246,6 +287,27 @@ class FlowPromptStudioClient {
   async getAssetPlan(refresh = false) { return this._request(`/production/asset-plan?refresh=${refresh}`); }
   async getBundle(refresh = false) { return this._request(`/production/bundle?refresh=${refresh}`); }
   async getProjectMap() { return this._request("/production/project-map"); }
+
+  /**
+   * Estimate shot count and duration for a screenplay file (dry-run).
+   * Reads scene count locally without uploading.
+   */
+  async estimate(filePath) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    // Naive scene detection: look for scene markers
+    const sceneMatches = content.match(/(?:SAHNE|SCENE|SCÈNE|SCENA|SZENE)\s*[:.\-—]?\s*\d+/gi) || [];
+    const estimatedScenes = sceneMatches.length || Math.ceil(content.length / 2000);
+    return {
+      filename: path.basename(filePath),
+      fileSizeKb: Math.round(fs.statSync(filePath).size / 1024),
+      estimatedScenes,
+      estimatedShots: estimatedScenes * 11, // ~11 shots per scene average
+      estimatedDurationMinutes: Math.round(estimatedScenes * 0.3),
+    };
+  }
 
   /* ── Repair ── */
   async getErrorTypes() { return this._request("/repair/error-types"); }

@@ -1,7 +1,7 @@
 {
   "name": "flow-prompt-studio",
-  "version": "2.1.0",
-  "description": "Screenplay parser, shot coverage generator & AI prompt engine — DeepSeek, OpenAI, Claude. No backend. Zero-config. One command.",
+  "version": "2.2.0",
+  "description": "AI film production toolkit: screenplay parser, shot coverage, storyboard generator, ScreenJSON export & AI prompt engine. No backend. Zero-config. One command.",
   "main": "src/index.js",
   "types": "index.d.ts",
   "bin": {

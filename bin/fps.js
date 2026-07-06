@@ -24,6 +24,8 @@ const { ScreenplayParser } = require("../src/parser");
 const { CoverageGenerator } = require("../src/coverage");
 const { FileExporter } = require("../src/export");
 const { AIPromptGenerator } = require("../src/generate");
+const { StoryboardGenerator } = require("../src/storyboard");
+const { ScreenJSONConverter } = require("../src/screenjson");
 const { chalk, spinner } = require("../src/utils");
 
 const pkg = require("../package.json");
@@ -210,11 +212,82 @@ program
     info.equipment.forEach((e) => console.log(`   - ${e}`));
   }));
 
-/* ── export ── */
+/* ── storyboard ── */
+program
+  .command("storyboard")
+  .description("Generate storyboard images from shot plan (free, no API key needed)")
+  .option("-f, --file <screenplay>", "Screenplay file to parse")
+  .option("-g, --genre <genre>", "Coverage genre", "drama")
+  .option("-s, --scenes <count>", "Number of scenes (if no file)", "5")
+  .option("--style <style>", "Visual style: cinematic, sketch, anime, comic, realistic, neon, watercolor", "cinematic")
+  .option("--scenes-filter <ids>", "Only generate for specific scene IDs (comma-separated)", "")
+  .option("--limit <n>", "Max number of images to generate", "20")
+  .option("-o, --output <dir>", "Output directory", "./storyboard")
+  .option("--list-styles", "List available visual styles")
+  .action(withErrorHandler(async (opts) => {
+    if (opts.listStyles) {
+      console.log(chalk.cyan("Available storyboard styles:\n"));
+      StoryboardGenerator.listStyles().forEach((s) => {
+        console.log(`   ${chalk.bold(s.key.padEnd(15))} ${s.description}`);
+      });
+      return;
+    }
+
+    // Get coverage result
+    let coverageResult;
+    if (opts.file) {
+      if (!fs.existsSync(opts.file)) {
+        console.error(chalk.red(`File not found: ${opts.file}`));
+        process.exit(1);
+      }
+      const spin1 = spinner("Parsing screenplay...");
+      const parseResult = ScreenplayParser.parse(opts.file);
+      coverageResult = CoverageGenerator.generate(parseResult, opts.genre);
+      spin1.stop(chalk.green(`✓ ${coverageResult.sceneCount} scenes, ${coverageResult.totalShots} shots`));
+    } else {
+      const sceneCount = parseInt(opts.scenes, 10) || 5;
+      coverageResult = CoverageGenerator.generateFromSceneCount(sceneCount, opts.genre);
+    }
+
+    const style = opts.style || "cinematic";
+    const limit = parseInt(opts.limit, 10) || 20;
+    const outputDir = opts.output || "./storyboard";
+
+    const sb = new StoryboardGenerator({ style, concurrency: 3 });
+
+    console.log(chalk.cyan(`\n🎨 Generating ${style} storyboard...`));
+    console.log(chalk.gray(`   Provider: Pollinations.ai (free, no API key)`));
+    console.log(chalk.gray(`   Images: up to ${Math.min(limit, coverageResult.totalShots)} of ${coverageResult.totalShots} shots`));
+    console.log(chalk.gray(`   This may take a minute...\n`));
+
+    const spin2 = spinner("Generating storyboard images...");
+    const result = await sb.generate(coverageResult, outputDir, {
+      style,
+      limit,
+      scenes: opts.scenesFilter || null,
+    });
+
+    spin2.stop(chalk.green(`✓ Generated ${result.totalGenerated} images`));
+
+    // Save HTML
+    const htmlPath = path.join(outputDir, "storyboard.html");
+    fs.writeFileSync(htmlPath, result.html, "utf-8");
+
+    console.log(chalk.green(`\n🎬 Storyboard complete!`));
+    console.log(chalk.gray(`   ${result.totalGenerated} images → ${outputDir}/`));
+    console.log(chalk.gray(`   View: open ${htmlPath}`));
+
+    if (result.totalGenerated < result.totalRequested) {
+      console.log(chalk.yellow(`\n   ⚠ ${result.totalRequested - result.totalGenerated} images could not be generated.`));
+      console.log(chalk.gray(`   Prompts saved as .txt files for manual generation.`));
+    }
+  }));
+
+/* ── export (updated with screenjson) ── */
 program
   .command("export <type>")
   .description("Export parse results or shot plans to files")
-  .option("-f, --format <fmt>", "Format: json, csv, markdown, html", "markdown")
+  .option("-f, --format <fmt>", "Format: json, csv, markdown, html, screenjson", "markdown")
   .option("-o, --output <dir>", "Output directory", "./output")
   .option("--file <screenplay>", "Screenplay file to parse first")
   .option("-g, --genre <genre>", "Genre for shot plan", "drama")
@@ -233,6 +306,19 @@ program
         process.exit(1);
       }
       const result = ScreenplayParser.parse(filePath);
+
+      // ScreenJSON format
+      if (opts.format === "screenjson") {
+        if (opts.stdout) {
+          console.log(ScreenJSONConverter.toJSON(result));
+        } else {
+          const outPath = path.join(opts.output, path.basename(filePath, path.extname(filePath)) + ".screenjson");
+          ScreenJSONConverter.toFile(result, outPath);
+          console.log(chalk.green(`✓ ${outPath}`));
+        }
+        return;
+      }
+
       if (opts.stdout) {
         FileExporter.toStdout(result);
       } else {

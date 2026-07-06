@@ -18,6 +18,8 @@ const { ScreenplayParser } = require("./parser");
 const { CoverageGenerator } = require("./coverage");
 const { FileExporter } = require("./export");
 const { AIPromptGenerator } = require("./generate");
+const { StoryboardGenerator } = require("./storyboard");
+const { ScreenJSONConverter } = require("./screenjson");
 
 class FlowPromptStudio {
   constructor(baseUrl) {
@@ -91,6 +93,25 @@ class FlowPromptStudio {
 
   static getProvidersStatus() {
     return AIPromptGenerator.getProvidersStatus();
+  }
+
+  /* ── Storyboard generation ── */
+  async generateStoryboard(coverageResult, outputDir, options = {}) {
+    const sb = new StoryboardGenerator(options);
+    return sb.generate(coverageResult, outputDir, options);
+  }
+
+  static listStoryStyles() {
+    return StoryboardGenerator.listStyles();
+  }
+
+  /* ── ScreenJSON export ── */
+  toScreenJSON(parseResult, options = {}) {
+    return ScreenJSONConverter.convert(parseResult, options);
+  }
+
+  exportScreenJSON(parseResult, outputPath, options = {}) {
+    return ScreenJSONConverter.toFile(parseResult, outputPath, options);
   }
 
   /* ── Backend-dependent: ping ── */
@@ -208,6 +229,13 @@ const fps = {
     return gen.generate(parseResult, coverageResult, scope, opts);
   },
   getProvidersStatus: () => AIPromptGenerator.getProvidersStatus(),
+  storyboard: (coverageResult, outputDir, opts) => {
+    const sb = new StoryboardGenerator(opts);
+    return sb.generate(coverageResult, outputDir, opts);
+  },
+  listStoryStyles: () => StoryboardGenerator.listStyles(),
+  toScreenJSON: (parseResult, opts) => ScreenJSONConverter.convert(parseResult, opts),
+  exportScreenJSON: (parseResult, outputPath, opts) => ScreenJSONConverter.toFile(parseResult, outputPath, opts),
   version: require("../package.json").version,
 };
 
@@ -218,5 +246,7 @@ module.exports = {
   CoverageGenerator,
   FileExporter,
   AIPromptGenerator,
+  StoryboardGenerator,
+  ScreenJSONConverter,
   fps,
 };

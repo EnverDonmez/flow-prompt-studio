@@ -23,7 +23,7 @@ const client = new FlowPromptStudioClient();
 program
   .name("fps")
   .description("Senaryodan Google Flow / Veo AI prompt paketi üretici")
-  .version("1.0.0");
+  .version(require("../package.json").version);
 
 /* ── upload ── */
 program

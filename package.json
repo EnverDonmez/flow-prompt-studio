@@ -1,8 +1,9 @@
 {
   "name": "flow-prompt-studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Senaryodan Google Flow / Veo AI prompt paketi üretici — CLI, programmatic API ve Claude Code skill'i",
   "main": "src/index.js",
+  "types": "index.d.ts",
   "bin": {
     "fps": "bin/fps.js",
     "flow-prompt-studio": "bin/fps.js"
@@ -11,11 +12,13 @@
     "bin/",
     "src/",
     "skills/",
-    "README.md"
+    "README.md",
+    "index.d.ts"
   ],
   "scripts": {
     "start": "node bin/fps.js",
-    "test": "node -e \"const fps = require('./src/index.js'); console.log('Flow Prompt Studio v' + fps.version);\""
+    "test": "node --test tests/*.test.js",
+    "smoke": "node -e \"const fps = require('./src/index.js'); console.log('Flow Prompt Studio v' + fps.version);\""
   },
   "keywords": [
     "google-flow",

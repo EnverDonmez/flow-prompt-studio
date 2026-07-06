@@ -13,7 +13,7 @@ class FlowPromptStudio {
     this.client = new FlowPromptStudioClient(baseUrl);
   }
 
-  get version() { return "1.0.0"; }
+  get version() { return require("../package.json").version; }
 
   /* ── Full automated workflow ── */
   async workflow(screenplayPath, options = {}) {

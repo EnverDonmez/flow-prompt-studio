@@ -2,12 +2,21 @@
  * Flow Prompt Studio — Programmatic API
  *
  * Usage:
+ *   const fps = require('flow-prompt-studio');
+ *   const result = fps.parse('screenplay.pdf');
+ *   const plan = fps.cover(result, 'action');
+ *   fps.export(plan, 'csv', './output/');
+ *
+ *   // AI-powered (requires backend):
  *   const { FlowPromptStudio } = require('flow-prompt-studio');
- *   const fps = new FlowPromptStudio();
- *   await fps.workflow('screenplay.pdf');
+ *   const studio = new FlowPromptStudio();
+ *   await studio.workflow('screenplay.pdf');
  */
 
 const { FlowPromptStudioClient } = require("./client");
+const { ScreenplayParser } = require("./parser");
+const { CoverageGenerator } = require("./coverage");
+const { FileExporter } = require("./export");
 
 class FlowPromptStudio {
   constructor(baseUrl) {
@@ -16,7 +25,67 @@ class FlowPromptStudio {
 
   get version() { return require("../package.json").version; }
 
-  /* ── Full automated workflow ── */
+  /* ── Offline: Parse screenplay ── */
+  parse(filePath) {
+    return ScreenplayParser.parse(filePath);
+  }
+
+  parseText(text, label) {
+    return ScreenplayParser.parseText(text, label);
+  }
+
+  /* ── Offline: Generate shot coverage ── */
+  cover(parseResult, genre = "drama") {
+    return CoverageGenerator.generate(parseResult, genre);
+  }
+
+  coverFromSceneCount(sceneCount, genre = "drama") {
+    return CoverageGenerator.generateFromSceneCount(sceneCount, genre);
+  }
+
+  listGenres() {
+    return CoverageGenerator.listGenres();
+  }
+
+  getGenre(genre) {
+    return CoverageGenerator.getGenre(genre);
+  }
+
+  /* ── Offline: Export to file ── */
+  exportParseResult(parseResult, format, outputDir) {
+    return FileExporter.exportParseResult(parseResult, format, outputDir);
+  }
+
+  exportShotPlan(coverageResult, format, outputDir) {
+    return FileExporter.exportShotPlan(coverageResult, format, outputDir);
+  }
+
+  /* ── Offline: Render to string ── */
+  shotPlanToMarkdown(coverageResult) {
+    return CoverageGenerator.toMarkdown(coverageResult);
+  }
+
+  shotPlanToCSV(coverageResult) {
+    return CoverageGenerator.toCSV(coverageResult);
+  }
+
+  shotPlanToHTML(coverageResult) {
+    return FileExporter._shotPlanToHtml(coverageResult);
+  }
+
+  /* ── Hybrid: Local workflow (no backend needed) ── */
+  workflowLocal(screenplayPath, genre = "drama") {
+    const parseResult = this.parse(screenplayPath);
+    const coverageResult = this.cover(parseResult, genre);
+    return { parse: parseResult, coverage: coverageResult };
+  }
+
+  /* ── Backend-dependent: ping ── */
+  async ping() {
+    return this.client.ping();
+  }
+
+  /* ── Full automated workflow (needs backend) ── */
   async workflow(screenplayPath, options = {}) {
     const {
       scope = "full_pack",
@@ -89,24 +158,12 @@ class FlowPromptStudio {
     return result;
   }
 
-  /** Check if backend is reachable */
-  async ping() {
-    return this.client.ping();
-  }
-
-  /* ── Individual API wrappers ── */
-  async upload(filePath) {
-    return this.client.uploadScreenplay(filePath);
-  }
-
+  /* ── Individual API wrappers (backend) ── */
+  async upload(filePath) { return this.client.uploadScreenplay(filePath); }
   async analyze() {
-    const [analysis, stats] = await Promise.all([
-      this.client.getAnalysis(),
-      this.client.getStats(),
-    ]);
+    const [analysis, stats] = await Promise.all([this.client.getAnalysis(), this.client.getStats()]);
     return { analysis, stats };
   }
-
   async detectStyle() { return this.client.detectStyle(); }
   async generate(scope = "full_pack", ultra = false) { return this.client.generate(scope, ultra); }
   async getCoverage(refresh = true) { return this.client.getBundle(refresh); }
@@ -118,4 +175,28 @@ class FlowPromptStudio {
   async getConfig() { return this.client.getConfig(); }
 }
 
-module.exports = { FlowPromptStudio, FlowPromptStudioClient };
+// Top-level convenience exports (no instantiation needed for offline features)
+const fps = {
+  parse: (filePath) => ScreenplayParser.parse(filePath),
+  parseText: (text, label) => ScreenplayParser.parseText(text, label),
+  cover: (parseResult, genre) => CoverageGenerator.generate(parseResult, genre),
+  coverFromSceneCount: (count, genre) => CoverageGenerator.generateFromSceneCount(count, genre),
+  listGenres: () => CoverageGenerator.listGenres(),
+  getGenre: (genre) => CoverageGenerator.getGenre(genre),
+  exportParseResult: (r, f, d) => FileExporter.exportParseResult(r, f, d),
+  exportShotPlan: (r, f, d) => FileExporter.exportShotPlan(r, f, d),
+  toMarkdown: (r) => CoverageGenerator.toMarkdown(r),
+  toCSV: (r) => CoverageGenerator.toCSV(r),
+  toStdout: (d) => FileExporter.toStdout(d),
+  version: require("../package.json").version,
+};
+
+module.exports = {
+  FlowPromptStudio,
+  FlowPromptStudioClient,
+  ScreenplayParser,
+  CoverageGenerator,
+  FileExporter,
+  // Convenience: fps.parse(), fps.cover(), etc.
+  fps,
+};

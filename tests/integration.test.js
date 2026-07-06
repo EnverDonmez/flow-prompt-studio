@@ -75,9 +75,9 @@ describe("Integration Tests", () => {
     it("command help works (workflow --help)", () => {
       const { stdout, status } = fps("workflow --help");
       assert.equal(status, 0);
+      assert.ok(stdout.includes("--genre"), "workflow --help should show --genre");
+      assert.ok(stdout.includes("--ai"), "workflow --help should show --ai");
       assert.ok(stdout.includes("--dry-run"), "workflow --help should show --dry-run");
-      assert.ok(stdout.includes("--ultra"), "workflow --help should show --ultra");
-      assert.ok(stdout.includes("--no-generate"), "workflow --help should show --no-generate");
     });
 
     it("command help works (estimate --help)", () => {
@@ -200,29 +200,27 @@ describe("Integration Tests", () => {
     });
 
     it("doctor runs successfully even without backend", () => {
-      // Use non-routable IP for fast connection refusal
+      // doctor now shows offline commands — no connection needed
       const result = spawnSync(process.execPath, [FPS_BIN, "doctor"], {
         encoding: "utf-8",
         timeout: 10000,
-        env: { ...process.env, FPS_API_URL: "http://192.0.2.1:1/api/v1" },
+        env: { ...process.env, FPS_API_URL: "http://0.0.0.0:1/api/v1" },
       });
       const stdout = (result.stdout || "").trim();
       const combined = ((result.stdout || "") + (result.stderr || "")).trim();
       // May exit non-zero depending on connection timing — we just care about output content
       assert.ok(stdout.includes("Node.js"), "should check Node.js version");
       assert.ok(combined.includes("npm") || combined.includes("fps"), "should mention npm or fps version");
-      assert.ok(combined.includes("Backend") || combined.includes("backend"), "should check backend");
-      assert.ok(combined.includes("Recommendations") || combined.includes("To fix"),
-        "should show recommendations");
+      assert.ok(combined.includes("offline") || combined.includes("AI"), "should mention capabilities");
+      assert.ok(combined.includes("parse") || combined.includes("shots") || combined.includes("interactive"),
+        "should show available commands");
     });
 
-    it("export without format lists all formats", () => {
-      const { stdout, status } = fps("export");
-      assert.equal(status, 0);
-      assert.ok(stdout.includes("markdown"), "should list markdown format");
-      assert.ok(stdout.includes("production-pack-zip"), "should list production-pack-zip");
-      assert.ok(stdout.includes("shot-plan-csv"), "should list shot-plan-csv");
-      assert.equal(stdout.split("\n").length >= 14, true, "should list at least 14 formats");
+    it("export without type shows usage error", () => {
+      const { combined, status } = fps("export");
+      // New export requires <type> argument
+      assert.ok(combined.includes("missing") || combined.includes("error") || combined.includes("Invalid") || combined.includes("type"),
+        `should show usage info, got: ${combined}`);
     });
 
     it("repair without type lists error types", () => {
@@ -235,10 +233,10 @@ describe("Integration Tests", () => {
       );
     });
 
-    it("invalid format gives clear error", () => {
-      const { combined } = fps("export invalid_xyz");
-      assert.ok(combined.includes("Invalid format"),
-        `should say invalid format, got: ${combined}`);
+    it("invalid type gives clear error", () => {
+      const { combined } = fps("export invalid_type_xyz");
+      assert.ok(combined.includes("Invalid"),
+        `should say invalid type, got: ${combined}`);
     });
   });
 
@@ -487,10 +485,10 @@ describe("Integration Tests", () => {
         `should clearly say file not found, got: ${combined}`);
     });
 
-    it("export with invalid format gives clear error", () => {
-      const { combined } = fps("export nonexistent_format");
-      assert.ok(combined.includes("Invalid format"),
-        `should say 'Invalid format', got: ${combined}`);
+    it("export with invalid type gives clear error", () => {
+      const { combined } = fps("export nonexistent_type_xyz");
+      assert.ok(combined.includes("Invalid"),
+        `should say invalid, got: ${combined}`);
     });
 
     it("style --show without backend gives graceful error", () => {

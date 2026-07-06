@@ -1,8 +1,10 @@
 # Flow Prompt Studio CLI
 
-**Screenplay to Google Flow / Veo AI prompt pack generator**
+**Offline-first screenplay parser & shot coverage generator — no backend required.**
 
-Drop in a screenplay file — get character analysis, visual style detection, camera coverage plan, shot plan, asset plan, AI prompt pack, repair prompts, copy-ready Flow blocks, and all export formats automatically generated.
+Drop in a screenplay file and get scene analysis, character extraction, dialogue stats, and a full shot coverage plan. All locally. No API keys. No internet. Just you and the script.
+
+> ✨ **v2.0**: Completely offline. Backend only needed for AI prompt generation. `npm install -g` and start working immediately.
 
 ## Installation
 
@@ -10,140 +12,149 @@ Drop in a screenplay file — get character analysis, visual style detection, ca
 npm install -g flow-prompt-studio
 ```
 
-## Requirements
-
-- Node.js >= 18
-- Flow Prompt Studio Backend (`http://localhost:8000`)
-- DeepSeek API Key (in backend `.env` file)
+**Zero extra dependencies.** Only needs Node.js >= 18.
 
 ## Quick Start
 
 ```bash
-# Check backend status
-fps config
+# Parse a screenplay (offline — works instantly)
+fps parse screenplay.txt
 
-# Estimate before running (dry-run)
-fps estimate screenplay.pdf
+# Parse with JSON output (pipe-friendly)
+fps parse screenplay.txt --json
 
-# Upload screenplay and run full workflow
-fps workflow screenplay.pdf
+# Generate a shot coverage plan for any genre
+fps shots action -s 12
 
-# Run with dry-run preview first
-fps workflow screenplay.pdf --dry-run
+# Parse + cover in one step
+fps shots drama -f screenplay.txt
 
-# Analysis only
-fps upload screenplay.pdf
-fps analyze
+# Browse genre templates
+fps template --list
+
+# Inspect a specific genre
+fps template horror
+
+# Export to files
+fps export parse-result -f screenplay.txt -o ./output/
+fps export shot-plan -g action -s 10 -f csv -o ./output/
+
+# Interactive step-by-step wizard
+fps interactive
+
+# Full workflow (local parse + shot plan + optional AI)
+fps workflow screenplay.txt
+fps workflow screenplay.txt --genre horror --ai
 ```
 
-## Commands
+## Offline Commands (no backend needed)
 
 | Command | Description |
-|---------|-------------|
-| `fps config` | Backend status and API key check |
-| `fps init` | Initialize a project with `.fpsrc` config |
-| `fps doctor` | System check and troubleshooting |
-| `fps upload <file>` | Upload screenplay (.txt, .md, .pdf, .docx) |
-| `fps estimate <file>` | Estimate shots/duration without uploading (dry-run) |
-| `fps analyze` | Extract characters, locations, props |
-| `fps style` | Visual style detection (AI or fallback) |
-| `fps generate` | Generate AI prompt pack |
-| `fps coverage` | Camera coverage and shot plan |
-| `fps repair [type]` | Generate repair prompt |
-| `fps validate` | Validate the prompt package |
-| `fps preview` | Preview generated markdown |
-| `fps export [format]` | Export (14 formats) |
-| `fps workflow <file>` | **Full automated 7-step workflow** |
+|---|---|
+| `fps parse <file>` | Parse screenplay — scenes, characters, dialogue |
+| `fps shots <genre>` | Generate shot coverage plan from genre template |
+| `fps template <genre>` | View genre template camera notes + equipment |
+| `fps export <type>` | Export parse/shots to files (json, csv, md, html) |
+| `fps interactive` | Step-by-step wizard — no flags, just follow prompts |
+| `fps workflow <file>` | Full workflow: parse → cover → export + optional AI |
 
-## Workflow
+### Parse Options
 
-`fps workflow screenplay.pdf` runs these steps in sequence:
+```
+fps parse <file> [--json] [--csv] [--markdown]
+```
 
-1. 📤 Screenplay upload
-2. 🔍 Character, location, prop analysis
-3. 🎨 Visual style detection
-4. 📷 Camera coverage plan (~11 shots/scene)
-5. 🤖 AI prompt pack generation (optional)
-6. ✅ Package validation
-7. 📦 Export (6 formats)
+Extracts:
+- **Scenes** — heading, number, location, dialogue count
+- **Characters** — name, frequency, which scenes they appear in
+- **Stats** — total scenes, characters, dialogue lines, estimated pages & duration
+- Supports: `.txt`, `.md`, `.fountain`, `.fdx` (Final Draft XML)
 
-With `--dry-run`, you get an estimate before the workflow starts.
+### Shot Coverage Genres
 
-## Project Configuration
+| Genre | Best For |
+|---|---|
+| `action` | Chase sequences, fights, stunts — fast-paced multi-cam |
+| `drama` | Character-driven stories — performance-focused coverage |
+| `horror` | Tension & fear — dutch angles, POV, negative space |
+| `documentary` | Interviews + vérité — handheld, natural light |
+| `music_video` | Rhythmic, stylized — beat-synced, slo-mo, macro |
+| `commercial` | Product-focused — hero shot, macro detail, lifestyle |
+| `short_film` | Festival-friendly — resource-conscious, hybrid |
 
-Initialize a project config file:
+### Export Formats
 
 ```bash
-fps init
+fps export parse-result --file script.txt --format json -o ./out/
+fps export shot-plan --genre action --scenes 10 --format html -o ./out/
+fps export shot-plan --file script.txt --genre action --format csv -o ./out/
+# For piping: --stdout
+fps export shot-plan -g drama -s 5 --format json --stdout | jq .
 ```
 
-This creates a `.fpsrc` file in your current directory:
+## Backend Commands (optional, for AI features)
 
-```json
-{
-  "apiUrl": "http://localhost:8000/api/v1",
-  "defaultScope": "full_pack",
-  "defaultFormats": ["markdown", "shot-plan-csv", "asset-plan-md", "playbook"],
-  "ultra": false,
-  "language": "en"
-}
-```
+These require the Flow Prompt Studio backend running at `http://localhost:8000`:
+
+| Command | Description |
+|---|---|
+| `fps upload <file>` | Upload to backend for AI analysis |
+| `fps generate` | AI prompt pack generation (DeepSeek) |
+| `fps workflow --ai` | Full workflow with AI prompt generation |
+
+Start the backend, then add `--ai` to any workflow command.
 
 ## Programmatic API
 
 ```javascript
+// Offline — no backend, no internet
+const fps = require('flow-prompt-studio').fps;
+
+// Parse a screenplay
+const result = fps.parse('screenplay.txt');
+console.log(result.scenes);       // [{ heading, location, characters... }]
+console.log(result.characters);   // [{ name, count }]
+console.log(result.stats);        // { totalScenes, totalCharacters, ... }
+
+// Generate shot coverage
+const plan = fps.cover(result, 'action');
+console.log(plan.totalShots);     // e.g. 126
+
+// Export to file
+fps.exportShotPlan(plan, 'csv', './output/');
+fps.exportShotPlan(plan, 'html', './output/');
+```
+
+```javascript
+// With backend (optional)
 const { FlowPromptStudio } = require('flow-prompt-studio');
-const fps = new FlowPromptStudio();
-
-// Check backend health
-const { reachable } = await fps.ping();
-
-// Estimate before running (no upload)
-const estimate = await fps.estimate('screenplay.pdf');
-console.log(estimate.estimatedShots); // e.g. 198
-
-// Full automated workflow
-const result = await fps.workflow('screenplay.pdf', { ultra: true });
-
-// Manual control
-await fps.upload('screenplay.pdf');
-const { analysis } = await fps.analyze();
-const style = await fps.detectStyle();
-const bundle = await fps.getCoverage();
-const gen = await fps.generate('full_pack', true);
-const validation = await fps.validate();
-const url = await fps.getExportUrl('production-pack-zip');
+const studio = new FlowPromptStudio();
+await studio.workflow('screenplay.pdf', { ultra: true });
 ```
 
 ## TypeScript
 
-Type definitions are included:
+Full type definitions included. Zero-config:
 
 ```typescript
-import { FlowPromptStudio, FlowPromptStudioClient } from 'flow-prompt-studio';
+import { fps, ScreenplayParser, CoverageGenerator, FileExporter } from 'flow-prompt-studio';
 
-const fps: FlowPromptStudio = new FlowPromptStudio();
-const result = await fps.workflow('screenplay.pdf', { ultra: true });
+const result = ScreenplayParser.parse('screenplay.txt');
+const plan = CoverageGenerator.generate(result, 'horror');
+FileExporter.exportShotPlan(plan, 'html', './output/');
 ```
 
-## Claude Code Skill
-
-This package works with Claude Code. The `skills/flow-prompt-studio.md` file lets Claude Code recognize this tool as a skill.
-
-## Troubleshooting
-
-Run the system check:
+## Project Configuration
 
 ```bash
-fps doctor
+fps init          # Creates .fpsrc in current directory
+fps doctor        # System check & troubleshooting
 ```
-
-Common issues:
-
-- **"Cannot connect to backend"** — Make sure the Flow Prompt Studio backend is running on port 8000
-- **"API key missing"** — Set `DEEPSEEK_API_KEY` in your backend `.env` file
-- **Upload failures** — Ensure the file format is supported (.txt, .md, .pdf, .docx)
 
 ## License
 
-MIT
+MIT — Free forever. No registration, no API key, no internet required for core features.
+
+---
+
+**Made for filmmakers, by filmmakers.** Parse. Plan. Shoot.

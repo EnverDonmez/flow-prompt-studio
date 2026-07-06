@@ -2,6 +2,44 @@
 
 All notable changes to Flow Prompt Studio.
 
+## [2.0.0] — 2026-07-06
+
+### Added — Offline-First Revolution
+- **Local screenplay parser** (`src/parser.js`) — scenes, characters, dialogue, stats. No AI needed.
+  - Supports `.txt`, `.md`, `.fountain`, `.fdx` (Final Draft XML)
+  - Scene detection: `SCENE`, `INT./EXT.`, `CHAPTER`, Fountain `#`, and more
+  - Character extraction: ALL-CAPS name detection with frequency tracking
+  - Dialogue counting, page estimation (1 page ≈ 1 minute)
+- **Shot coverage generator** (`src/coverage.js`) — 7 genre templates with 25 shot types
+  - `action`, `drama`, `horror`, `documentary`, `music_video`, `commercial`, `short_film`
+  - Each with: shot distribution, camera notes, equipment recommendations, pacing guide
+  - Output: structured JSON, CSV, Markdown, HTML storyboard
+- **File export engine** (`src/export.js`) — write actual files to disk
+  - Formats: `csv`, `json`, `markdown`, `html` (responsive storyboard with light/dark mode)
+  - `--stdout` flag for pipe-friendly output (CI/CD, AI agents)
+- **5 new CLI commands:**
+  - `fps parse <file>` — local screenplay analysis
+  - `fps shots <genre>` — shot coverage generation
+  - `fps template <genre>` — genre template browser
+  - `fps export <type>` — file export with format selection
+  - `fps interactive` — step-by-step wizard mode
+- **Hybrid workflow** — local parse + shot plan always work; `--ai` flag adds backend generation
+- **Top-level `fps` object** — `require('flow-prompt-studio').fps.parse()` for direct API
+- **46 new tests** (137 total): parser, coverage, export, updated integration
+
+### Changed
+- **Backend is now OPTIONAL** — core features work completely offline
+- `fps workflow` now runs local-first (parse → cover → export), AI is opt-in with `--ai`
+- `fps doctor` now recommends offline commands
+- `fps config` shows offline alternatives when backend is down
+- README rewritten with offline-first messaging
+- `package.json` description: "Offline-first screenplay parser & shot coverage generator"
+
+### Breaking Changes (from v1.x)
+- `fps export` now requires `<type>` argument (`parse-result` or `shot-plan`)
+- `fps workflow --no-generate` removed; use `fps workflow` (without `--ai`) for local-only
+- `fps workflow` flags changed: `--genre`, `--ai`, `--ultra`, `--dry-run`, `--output`
+
 ## [1.1.0] — 2026-07-06
 
 ### Added

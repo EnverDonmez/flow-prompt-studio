@@ -1,7 +1,7 @@
 {
   "name": "flow-prompt-studio",
-  "version": "1.1.1",
-  "description": "Screenplay to Google Flow / Veo AI prompt pack generator — CLI, programmatic API, and Claude Code skill",
+  "version": "2.0.0",
+  "description": "Offline-first screenplay parser & shot coverage generator — no backend required. CLI, programmatic API, and Claude Code skill.",
   "main": "src/index.js",
   "types": "index.d.ts",
   "bin": {
@@ -25,6 +25,13 @@
     "format": "prettier --write '**/*.{js,json,md}'"
   },
   "keywords": [
+    "screenplay-parser",
+    "shot-coverage",
+    "shot-list",
+    "film-production-tool",
+    "offline-first",
+    "cli-tool",
+    "storyboard",
     "google-flow",
     "veo",
     "ai-video",

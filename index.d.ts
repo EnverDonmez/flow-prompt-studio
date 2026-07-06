@@ -1,320 +1,212 @@
-// TypeScript types for flow-prompt-studio
+// TypeScript types for flow-prompt-studio v2.0
 // Minimum TypeScript version: 4.5+
 
-/* ─── Base Types ─── */
+/* ─── Screenplay Parser ─── */
+
+export interface SceneResult {
+  index: number;
+  number: string;
+  heading: string;
+  location: string;
+  lineNumber: number;
+  dialogueCount: number;
+  characters: string[];
+}
+
+export interface CharacterResult {
+  name: string;
+  count: number;
+}
+
+export interface ParseStats {
+  filename: string;
+  totalLines: number;
+  totalScenes: number;
+  totalCharacters: number;
+  totalDialogueLines: number;
+  estimatedPages: number;
+  estimatedDurationMinutes: number;
+  speakingCharacters: number;
+}
+
+export interface ParseResult {
+  scenes: SceneResult[];
+  characters: CharacterResult[];
+  stats: ParseStats;
+}
+
+export class ScreenplayParser {
+  static parse(filePath: string): ParseResult;
+  static parseText(text: string, label?: string): ParseResult;
+  /** @internal */ static _parseFdx(filePath: string): string;
+  /** @internal */ static _parseLines(lines: string[], filename: string): ParseResult;
+}
+
+/* ─── Shot Coverage Generator ─── */
+
+export interface ShotTypeInfo {
+  name: string;
+  desc: string;
+  typicalDuration: string;
+}
+
+export interface GenreInfo {
+  key: string;
+  name: string;
+  description: string;
+  shotsPerScene: number;
+  distribution: Record<string, number>;
+  cameraNotes: string[];
+  equipment: string[];
+  pacing: string;
+}
+
+export interface ShotRow {
+  "Shot #": number;
+  "Scene": string;
+  "Scene Heading": string;
+  "Shot Type": string;
+  "Shot Name": string;
+  "Description": string;
+  "Typical Duration": string;
+  "Characters": string;
+}
+
+export interface CoverageResult {
+  genre: GenreInfo;
+  sceneCount: number;
+  totalShots: number;
+  averageShotsPerScene: string;
+  estimatedDurationMinutes: number;
+  shotRows: ShotRow[];
+}
+
+export class CoverageGenerator {
+  static listGenres(): string[];
+  static getGenre(genre: string): GenreInfo;
+  static generate(parseResult: ParseResult, genre?: string): CoverageResult;
+  static generateFromSceneCount(sceneCount: number, genre?: string): CoverageResult;
+  static toMarkdown(result: CoverageResult): string;
+  static toCSV(result: CoverageResult): string;
+  /** @internal */ static _pickShotTypes(distribution: Record<string, number>, total: number): string[];
+}
+
+/* ─── File Exporter ─── */
+
+export class FileExporter {
+  static exportParseResult(result: ParseResult, format: "json" | "csv" | "markdown", outputDir: string): string;
+  static exportShotPlan(result: CoverageResult, format: "json" | "csv" | "markdown" | "html", outputDir: string): string;
+  static toStdout(data: any): void;
+  /** @internal */ static _shotPlanToHtml(result: CoverageResult): string;
+  /** @internal */ static _ensureDir(dir: string): void;
+  /** @internal */ static _writeFile(filePath: string, content: string): string;
+}
+
+/* ─── Convenience Top-Level API (no class instance needed) ─── */
+
+export interface FpsAPI {
+  parse(filePath: string): ParseResult;
+  parseText(text: string, label?: string): ParseResult;
+  cover(parseResult: ParseResult, genre?: string): CoverageResult;
+  coverFromSceneCount(count: number, genre?: string): CoverageResult;
+  listGenres(): string[];
+  getGenre(genre: string): GenreInfo;
+  exportParseResult(result: ParseResult, format: string, outputDir: string): string;
+  exportShotPlan(result: CoverageResult, format: string, outputDir: string): string;
+  toMarkdown(result: CoverageResult): string;
+  toCSV(result: CoverageResult): string;
+  toStdout(data: any): void;
+  version: string;
+}
+
+export const fps: FpsAPI;
+
+/* ─── Backend (optional) ─── */
 
 export interface UploadResult {
   success: boolean;
   filename: string;
   char_count: number;
   scene_count: number;
-  scenes: SceneMeta[];
+  scenes: { scene_id: string; [key: string]: any }[];
   error?: string;
 }
-
-export interface SceneMeta {
-  scene_id: string;
-  [key: string]: any;
-}
-
-export interface CharacterResult {
-  name: string;
-  count: number;
-  [key: string]: any;
-}
-
-export interface LocationResult {
-  name: string;
-  count: number;
-  source: string;
-  [key: string]: any;
-}
-
-export interface PropResult {
-  name: string;
-  count: number;
-  [key: string]: any;
-}
-
-export interface AnalysisResult {
-  characters: CharacterResult[];
-  locations: LocationResult[];
-  props: PropResult[];
-  [key: string]: any;
-}
-
-export interface StatsResult {
-  scene_count: number;
-  char_count: number;
-  estimated_segments: number;
-  [key: string]: any;
-}
-
-export interface StyleSettings {
-  visual_style?: string;
-  camera_language?: string;
-  [key: string]: any;
-}
-
-export interface StyleDetectionResult {
-  detected: boolean;
-  mode?: string;
-  message?: string;
-  settings: StyleSettings;
-}
-
-export interface BundleResult {
-  shot_rows: ShotRow[];
-  asset_plan?: AssetPlan;
-  repair_markdown?: string;
-}
-
-export interface ShotRow {
-  "Shot Type"?: string;
-  "Shot Türü"?: string;
-  [key: string]: any;
-}
-
-export interface AssetCollection {
-  [key: string]: any;
-}
-
-export interface AssetPlan {
-  collections?: AssetCollection[];
-  [key: string]: any;
-}
-
-export interface GenerationResult {
-  success?: boolean;
-  manual?: boolean;
-  model_used?: string;
-  markdown?: string;
-  master_prompt?: string;
-  error?: string;
-}
-
-export interface RepairResult {
-  count?: number;
-  markdown?: string;
-  repair?: {
-    flow_agent_prompt?: string;
-    retry_strategy?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-export interface ValidationResult {
-  issues: ValidationIssue[];
-  summary: ValidationSummary;
-}
-
-export interface ValidationIssue {
-  severity: "critical" | "warning" | "info";
-  message: string;
-  [key: string]: any;
-}
-
-export interface ValidationSummary {
-  critical: number;
-  warning: number;
-  info: number;
-}
-
-export interface ConfigResult {
-  has_api_key: boolean;
-  fast_model: string;
-  pro_model: string;
-  fallback_model: string;
-}
-
-export interface StyleConfig {
-  [key: string]: string;
-}
-
-export interface ErrorTypesResult {
-  error_types: string[];
-}
-
-export interface ContinuityResult {
-  [key: string]: any;
-}
-
-export interface MarkdownResult {
-  markdown_text?: string;
-  [key: string]: any;
-}
-
-export interface PingResult {
-  reachable: boolean;
-  error?: string;
-}
-
-export interface EstimateResult {
-  filename: string;
-  fileSizeKb: number;
-  estimatedScenes: number;
-  estimatedShots: number;
-  estimatedDurationMinutes: number;
-}
-
-/* ─── Workflow Options ─── */
 
 export interface WorkflowOptions {
-  /** Generation scope (default: "full_pack") */
   scope?: string;
-  /** Ultra image variation mode (default: false) */
   ultra?: boolean;
-  /** Run AI generation step (default: true) */
   generate?: boolean;
-  /** Export formats */
   exportFormats?: string[];
-  /** Progress callback */
   onProgress?: (step: string, message: string) => void;
 }
 
 export interface WorkflowResult {
   upload: UploadResult;
-  analysis: AnalysisResult;
-  stats: StatsResult;
-  style: StyleDetectionResult;
-  bundle: BundleResult;
-  generate?: GenerationResult;
-  validation: ValidationResult;
+  analysis: any;
+  stats: any;
+  style: any;
+  bundle: any;
+  generate?: any;
+  validation: any;
   exports: Record<string, string>;
 }
 
-/* ─── Client Options ─── */
-
-export interface ClientRequestOptions {
-  headers?: Record<string, string>;
-  body?: any;
-  method?: string;
-  signal?: AbortSignal;
-  _skipCache?: boolean;
-}
-
-/* ─── Retry / Error ─── */
-
-export interface RetryConfig {
-  /** Maximum retry attempts (default: 3) */
-  maxRetries: number;
-  /** Initial delay in ms (default: 1000) */
-  initialDelayMs: number;
-  /** Exponential backoff multiplier (default: 2) */
-  backoffMultiplier: number;
-  /** Maximum delay in ms (default: 30000) */
-  maxDelayMs: number;
-  /** Request timeout in ms (default: 60000) */
-  timeoutMs: number;
-  /** HTTP status codes that trigger a retry (default: [429, 502, 503, 504]) */
-  retryableStatuses: number[];
-}
-
-/* ─── FlowPromptStudioClient ─── */
+export interface PingResult { reachable: boolean; error?: string; }
+export interface EstimateResult { filename: string; fileSizeKb: number; estimatedScenes: number; estimatedShots: number; estimatedDurationMinutes: number; }
+export interface RetryConfig { maxRetries: number; initialDelayMs: number; backoffMultiplier: number; maxDelayMs: number; timeoutMs: number; retryableStatuses: number[]; }
 
 export class FlowPromptStudioClient {
   constructor(baseUrl?: string);
-
   baseUrl: string;
   retryConfig: RetryConfig;
-
-  /** Check if backend is reachable */
   ping(): Promise<PingResult>;
-
-  /** Estimate shot count and duration from a screenplay file (local, no upload) */
   estimate(filePath: string): Promise<EstimateResult>;
-
-  /** Clear the in-memory request cache */
-  clearCache(): void;
-
-  /** Core HTTP request with retry and timeout */
-  _request(path: string, options?: ClientRequestOptions): Promise<any>;
-
-  /* Session */
-  getSession(): Promise<any>;
-  resetSession(): Promise<any>;
-
-  /* Screenplay */
   uploadScreenplay(filePath: string): Promise<UploadResult>;
-  setScreenplayText(text: string): Promise<any>;
-  getScenes(): Promise<any>;
-  getStats(): Promise<StatsResult>;
-  getAnalysis(): Promise<AnalysisResult>;
-
-  /* Style */
-  detectStyle(): Promise<StyleDetectionResult>;
-  getStyle(): Promise<StyleConfig>;
-  updateStyle(data: Record<string, any>): Promise<any>;
-
-  /* Generation */
-  generate(scope?: string, forceUltra?: boolean, manualMode?: boolean): Promise<GenerationResult>;
-  getMasterPrompt(scope?: string, forceUltra?: boolean): Promise<any>;
-  submitManualOutput(output: string): Promise<any>;
-  getLogs(): Promise<any>;
-  getGenerationStatus(): Promise<any>;
-
-  /* Production */
-  getCoverage(refresh?: boolean): Promise<any>;
-  getAssetPlan(refresh?: boolean): Promise<any>;
-  getBundle(refresh?: boolean): Promise<BundleResult>;
-  getProjectMap(): Promise<any>;
-
-  /* Repair */
-  getErrorTypes(): Promise<ErrorTypesResult>;
-  generateRepair(
-    errorType: string,
-    sceneId?: string,
-    segmentId?: string,
-    problemDescription?: string
-  ): Promise<RepairResult>;
-  generateAllRepairs(): Promise<RepairResult>;
-
-  /* Preview */
-  getMarkdown(): Promise<MarkdownResult>;
-  updateMarkdown(text: string): Promise<any>;
-  getFlowCopyReady(): Promise<string>;
-  checkContinuity(): Promise<ContinuityResult>;
-
-  /* Validation */
-  validate(markdownText?: string): Promise<ValidationResult>;
-
-  /* Export */
+  getAnalysis(): Promise<any>;
+  getStats(): Promise<any>;
+  detectStyle(): Promise<any>;
+  generate(scope?: string, forceUltra?: boolean, manualMode?: boolean): Promise<any>;
+  getBundle(refresh?: boolean): Promise<any>;
+  generateRepair(errorType: string, sceneId?: string, segmentId?: string, problemDescription?: string): Promise<any>;
+  generateAllRepairs(): Promise<any>;
+  validate(markdownText?: string): Promise<any>;
   getExportUrl(format: string): string;
-
-  /* Config */
-  getConfig(): Promise<ConfigResult>;
+  getConfig(): Promise<any>;
+  clearCache(): void;
 }
-
-/* ─── FlowPromptStudio ─── */
 
 export class FlowPromptStudio {
   constructor(baseUrl?: string);
-
   client: FlowPromptStudioClient;
   readonly version: string;
 
-  /** Check if backend is reachable */
+  /* Offline API */
+  parse(filePath: string): ParseResult;
+  parseText(text: string, label?: string): ParseResult;
+  cover(parseResult: ParseResult, genre?: string): CoverageResult;
+  coverFromSceneCount(sceneCount: number, genre?: string): CoverageResult;
+  listGenres(): string[];
+  getGenre(genre: string): GenreInfo;
+  exportParseResult(result: ParseResult, format: string, outputDir: string): string;
+  exportShotPlan(result: CoverageResult, format: string, outputDir: string): string;
+  shotPlanToMarkdown(result: CoverageResult): string;
+  shotPlanToCSV(result: CoverageResult): string;
+  shotPlanToHTML(result: CoverageResult): string;
+  workflowLocal(screenplayPath: string, genre?: string): { parse: ParseResult; coverage: CoverageResult };
+
+  /* Backend API (optional) */
   ping(): Promise<PingResult>;
-
-  /** Full automated 7-step workflow */
   workflow(screenplayPath: string, options?: WorkflowOptions): Promise<WorkflowResult>;
-
-  /** Workflow with built-in CLI spinner */
   workflowProgressive(screenplayPath: string, options?: WorkflowOptions): Promise<WorkflowResult>;
-
-  /** Estimate shots/duration without uploading (dry-run) */
-  estimate(filePath: string): Promise<EstimateResult>;
-
-  /* Individual API wrappers */
   upload(filePath: string): Promise<UploadResult>;
-  analyze(): Promise<{ analysis: AnalysisResult; stats: StatsResult }>;
-  detectStyle(): Promise<StyleDetectionResult>;
-  generate(scope?: string, ultra?: boolean): Promise<GenerationResult>;
-  getCoverage(refresh?: boolean): Promise<BundleResult>;
-  repair(errorType: string, sceneId?: string, problem?: string): Promise<RepairResult>;
-  repairAll(): Promise<RepairResult>;
-  validate(): Promise<ValidationResult>;
+  analyze(): Promise<{ analysis: any; stats: any }>;
+  detectStyle(): Promise<any>;
+  generate(scope?: string, ultra?: boolean): Promise<any>;
+  getCoverage(refresh?: boolean): Promise<any>;
+  estimate(filePath: string): Promise<EstimateResult>;
+  repair(errorType: string, sceneId?: string, problem?: string): Promise<any>;
+  repairAll(): Promise<any>;
+  validate(): Promise<any>;
   getExportUrl(format: string): string;
-  getConfig(): Promise<ConfigResult>;
+  getConfig(): Promise<any>;
 }

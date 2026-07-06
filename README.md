@@ -1,10 +1,10 @@
 # Flow Prompt Studio CLI
 
-**Offline-first screenplay parser & shot coverage generator — no backend required.**
+**Screenplay parser + shot coverage generator + AI prompt engine. No backend. Zero-config.**
 
-Drop in a screenplay file and get scene analysis, character extraction, dialogue stats, and a full shot coverage plan. All locally. No API keys. No internet. Just you and the script.
+Parse. Plan. Generate AI prompts. All from one CLI. No Python. No servers. Just `npm install -g` and go.
 
-> ✨ **v2.0**: Completely offline. Backend only needed for AI prompt generation. `npm install -g` and start working immediately.
+> ✨ **v2.1**: AI prompt generation with DeepSeek, OpenAI, or Claude built right in. Backend fully optional.
 
 ## Installation
 
@@ -20,14 +20,18 @@ npm install -g flow-prompt-studio
 # Parse a screenplay (offline — works instantly)
 fps parse screenplay.txt
 
-# Parse with JSON output (pipe-friendly)
-fps parse screenplay.txt --json
-
-# Generate a shot coverage plan for any genre
+# Generate a shot coverage plan
 fps shots action -s 12
 
 # Parse + cover in one step
 fps shots drama -f screenplay.txt
+
+# AI prompt generation (DeepSeek, OpenAI, Claude)
+export DEEPSEEK_API_KEY=sk-...
+fps generate -f screenplay.txt -p deepseek
+
+# Full workflow: parse → cover → AI → export — ONE command
+fps workflow screenplay.txt --ai -p deepseek --genre horror -o ./output/
 
 # Browse genre templates
 fps template --list

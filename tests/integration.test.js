@@ -193,10 +193,16 @@ describe("Integration Tests", () => {
    * 4. Graceful errors (no backend)
    * ──────────────────────────────────── */
   describe("graceful errors without backend", () => {
-    it("config shows meaningful error when backend is down", () => {
-      const { combined } = fps("config");
-      assert.ok(combined.includes("not reachable") || combined.includes("Cannot connect"),
-        `should show connection error, got: ${combined}`);
+    it("config shows provider status even without backend", () => {
+      // New config shows AI providers first, then attempts backend (which may timeout)
+      const result = spawnSync(process.execPath, [FPS_BIN, "config"], {
+        encoding: "utf-8",
+        timeout: 15000,
+        env: { ...process.env, FPS_API_URL: "http://localhost:9999/api/v1" },
+      });
+      const combined = ((result.stdout || "") + (result.stderr || "")).trim();
+      assert.ok(combined.includes("DeepSeek") || combined.includes("AI Providers"),
+        `should show provider status, got: ${combined}`);
     });
 
     it("doctor runs successfully even without backend", () => {

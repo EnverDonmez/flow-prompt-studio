@@ -17,6 +17,7 @@ const { FlowPromptStudioClient } = require("./client");
 const { ScreenplayParser } = require("./parser");
 const { CoverageGenerator } = require("./coverage");
 const { FileExporter } = require("./export");
+const { AIPromptGenerator } = require("./generate");
 
 class FlowPromptStudio {
   constructor(baseUrl) {
@@ -78,6 +79,18 @@ class FlowPromptStudio {
     const parseResult = this.parse(screenplayPath);
     const coverageResult = this.cover(parseResult, genre);
     return { parse: parseResult, coverage: coverageResult };
+  }
+
+  /* ── Native AI generation (no backend needed) ── */
+  async generateAI(parseResult, coverageResult, scope = "full_pack", options = {}) {
+    const provider = options.provider || "deepseek";
+    const apiKey = options.apiKey || AIPromptGenerator.resolveApiKey(provider);
+    const gen = new AIPromptGenerator({ provider, apiKey, ...options });
+    return gen.generate(parseResult, coverageResult, scope, options);
+  }
+
+  static getProvidersStatus() {
+    return AIPromptGenerator.getProvidersStatus();
   }
 
   /* ── Backend-dependent: ping ── */
@@ -188,6 +201,13 @@ const fps = {
   toMarkdown: (r) => CoverageGenerator.toMarkdown(r),
   toCSV: (r) => CoverageGenerator.toCSV(r),
   toStdout: (d) => FileExporter.toStdout(d),
+  generate: (parseResult, coverageResult, scope, opts) => {
+    const provider = opts?.provider || "deepseek";
+    const apiKey = opts?.apiKey || AIPromptGenerator.resolveApiKey(provider);
+    const gen = new AIPromptGenerator({ provider, apiKey, ...opts });
+    return gen.generate(parseResult, coverageResult, scope, opts);
+  },
+  getProvidersStatus: () => AIPromptGenerator.getProvidersStatus(),
   version: require("../package.json").version,
 };
 
@@ -197,6 +217,6 @@ module.exports = {
   ScreenplayParser,
   CoverageGenerator,
   FileExporter,
-  // Convenience: fps.parse(), fps.cover(), etc.
+  AIPromptGenerator,
   fps,
 };

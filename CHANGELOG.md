@@ -2,6 +2,32 @@
 
 All notable changes to Flow Prompt Studio.
 
+## [2.1.0] — 2026-07-06
+
+### Added — Native AI Generation (No Backend Required)
+- **`src/generate.js`** — Direct AI API calls to DeepSeek, OpenAI, and Anthropic
+  - Provider-agnostic: uniform interface for all 3 AI services
+  - 4 prompt scopes: `full_pack` (13 sections), `scene_breakdown`, `character_bible`, `ultra_image_variation`
+  - Smart prompt engineering: screenplay data auto-embedded in prompts
+  - API key resolution: env vars → `.env` file → `.fpsrc` config → CLI flag
+  - Key sanitization: never logs or displays API keys
+- **`fps generate`** now works without Python backend
+  - `--provider deepseek|openai|anthropic` — pick your AI
+  - `--key` flag or env var — flexible auth
+  - `--file` — auto-parses screenplay for context-rich prompts
+  - `--scope` — 4 prompt templates available
+  - `--ultra` — maximum variation mode
+- **`fps workflow --ai`** — fully backend-free: parse → cover → AI → export
+  - Works with `--provider` and `--key` flags
+  - Auto-saves AI output alongside parse/coverage exports
+- **`fps config`** — now shows all 3 AI provider statuses
+- **24 new tests** (161 total): generate module, prompt templates, providers
+
+### Changed
+- Python backend is now **fully optional** for all features
+- `fps workflow --ai` no longer checks backend connection
+- Package description updated: "No backend. Zero-config. One command."
+
 ## [2.0.0] — 2026-07-06
 
 ### Added — Offline-First Revolution

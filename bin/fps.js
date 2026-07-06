@@ -23,6 +23,7 @@ const { FlowPromptStudioClient } = require("../src/client");
 const { ScreenplayParser } = require("../src/parser");
 const { CoverageGenerator } = require("../src/coverage");
 const { FileExporter } = require("../src/export");
+const { AIPromptGenerator } = require("../src/generate");
 const { chalk, spinner } = require("../src/utils");
 
 const pkg = require("../package.json");
@@ -334,27 +335,40 @@ program
 /* ── config ── */
 program
   .command("config")
-  .description("Show backend configuration and connection status")
+  .description("Show AI provider status and configuration")
   .action(withErrorHandler(async () => {
-    const spin = spinner("Checking backend connection...");
-    const ping = await client.ping();
-    if (ping.reachable) {
-      const cfg = await client.getConfig();
-      spin.stop(chalk.green("✓ Backend is reachable"));
-      console.log(chalk.cyan("\nBackend Configuration:"));
-      console.log(`   API Key:    ${cfg.has_api_key ? chalk.green("✓ Present") : chalk.red("✗ Missing")}`);
-      console.log(`   Fast Model: ${cfg.fast_model}`);
-      console.log(`   Pro Model:  ${cfg.pro_model}`);
-      console.log(`   Fallback:   ${cfg.fallback_model}`);
-      console.log(`   URL:        ${client.baseUrl}`);
-    } else {
-      spin.stop(chalk.red("✗ Backend is not reachable (optional for offline features)"));
-      console.log(chalk.gray("\n   The backend is only required for AI prompt generation."));
-      console.log(chalk.green("\n   Try these offline commands instead:"));
-      console.log("     fps parse <file>      Parse screenplay locally");
-      console.log("     fps shots <genre>     Generate shot coverage");
-      console.log("     fps interactive       Step-by-step wizard");
+    console.log(chalk.cyan("🔧 Flow Prompt Studio — Configuration\n"));
+
+    // AI Providers
+    console.log(chalk.yellow("AI Providers (no backend needed):"));
+    const providers = AIPromptGenerator.getProvidersStatus();
+    providers.forEach((p) => {
+      const icon = p.configured ? chalk.green("✓") : chalk.gray("✗");
+      const status = p.configured ? `configured (${p.envVar})` : `not configured (set ${p.envVar})`;
+      console.log(`   ${icon} ${p.name.padEnd(12)} ${status}`);
+    });
+
+    console.log(chalk.gray("\n   Set API keys via environment variables, --key flag, or .fpsrc config."));
+    console.log(chalk.gray("   Example: export DEEPSEEK_API_KEY=sk-..."));
+
+    // Backend (optional)
+    console.log(chalk.yellow("\nBackend (optional, for legacy API):"));
+    try {
+      const ping = await client.ping();
+      if (ping.reachable) {
+        console.log(chalk.green(`   ✓ Backend reachable at ${client.baseUrl}`));
+      } else {
+        console.log(chalk.gray(`   ✗ Backend not running (not needed for AI features)`));
+      }
+    } catch {
+      console.log(chalk.gray(`   ✗ Backend not running (not needed for AI features)`));
     }
+
+    console.log(chalk.green("\n✓ Offline commands always available:"));
+    console.log("   fps parse <file>       Parse screenplay");
+    console.log("   fps shots <genre>      Generate shot coverage");
+    console.log("   fps generate -f <file>  AI prompt pack (needs API key)");
+    console.log("   fps interactive         Step-by-step wizard");
   }));
 
 /* ── workflow (hybrid: local + optional backend) ── */
@@ -362,7 +376,9 @@ program
   .command("workflow <screenplay>")
   .description("Full workflow: local parse + shot plan + optional AI (if backend available)")
   .option("-g, --genre <genre>", "Coverage genre", "drama")
-  .option("--ai", "Also run AI generation (requires backend)")
+  .option("--ai", "Also run AI generation (DeepSeek/OpenAI/Claude — no backend needed)")
+  .option("-p, --provider <provider>", "AI provider for --ai", "deepseek")
+  .option("-k, --key <key>", "API key for AI provider")
   .option("--ultra", "Ultra mode for AI generation")
   .option("--dry-run", "Estimate first, then run")
   .option("-o, --output <dir>", "Export output directory")
@@ -406,25 +422,34 @@ program
     files.push(FileExporter.exportShotPlan(coverageResult, "html", outputDir));
     spin3.stop(chalk.green(`  ✓ ${files.length} files saved to ${outputDir}/`));
 
-    /* ── Phase 2: AI (only if backend available and --ai flag) ── */
+    /* ── Phase 2: AI (native, no backend needed) ── */
     if (opts.ai) {
       console.log(chalk.cyan("\n🤖 Phase 2: AI Generation\n"));
-      const ping = await client.ping();
-      if (ping.reachable) {
+
+      const provider = opts.provider || "deepseek";
+      const apiKey = opts.key || AIPromptGenerator.resolveApiKey(provider);
+
+      if (!apiKey) {
+        console.log(chalk.yellow(`  ⚠ No API key for ${provider} — skipping AI generation`));
+        const envVar = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" }[provider];
+        console.log(chalk.gray(`    Set ${envVar} or use --key flag`));
+      } else {
         const spin4 = spinner("  Generating AI prompt pack...");
         try {
-          const genResult = await client.generate("full_pack", opts.ultra || false);
+          const gen = new AIPromptGenerator({ provider, apiKey });
+          const genResult = await gen.generate(parseResult, coverageResult, "full_pack", { ultra: opts.ultra || false });
           if (genResult.success) {
-            spin4.stop(chalk.green(`  ✓ AI generation complete (${genResult.model_used})`));
+            spin4.stop(chalk.green(`  ✓ AI generation complete (${genResult.providerName} / ${genResult.model})`));
+            // Save AI output
+            const aiFile = path.join(outputDir, `ai-prompt-${genResult.provider}.md`);
+            fs.writeFileSync(aiFile, genResult.markdown, "utf-8");
+            console.log(chalk.gray(`    Saved: ${aiFile} (${genResult.markdown.length} chars)`));
           } else {
             spin4.stop(chalk.yellow(`  ⚠ AI generation: ${genResult.error || "incomplete"}`));
           }
         } catch (err) {
           spin4.stop(chalk.yellow(`  ⚠ AI generation failed: ${err.message}`));
         }
-      } else {
-        console.log(chalk.yellow("  ⚠ Backend not available — skipping AI generation"));
-        console.log(chalk.gray("    Start the backend and run: fps generate --scope full_pack"));
       }
     }
 
@@ -433,7 +458,7 @@ program
     console.log(chalk.green(`\n🎬 Workflow complete in ${elapsed}s`));
     console.log(chalk.gray(`   ${stats.totalScenes} scenes → ${coverageResult.totalShots} shots → ${outputDir}/`));
     if (!opts.ai) {
-      console.log(chalk.gray(`\n   Tip: Add --ai to also generate AI prompts (requires backend)`));
+      console.log(chalk.gray(`\n   Tip: Add --ai to also generate AI prompts (DeepSeek/OpenAI/Claude)`));
     }
   }));
 
@@ -494,21 +519,68 @@ program
   }));
 
 program
-  .command("generate").description("Generate AI prompt pack (needs backend)")
-  .option("-s, --scope <scope>", "Scope", "full_pack")
-  .option("-u, --ultra", "Ultra mode")
-  .option("-o, --output <file>", "Save to file")
+  .command("generate")
+  .description("Generate AI prompt pack (DeepSeek, OpenAI, Claude — no backend needed)")
+  .option("-p, --provider <provider>", "AI provider: deepseek, openai, anthropic", "deepseek")
+  .option("-k, --key <key>", "API key (or set env var)")
+  .option("-m, --model <model>", "Model override")
+  .option("-s, --scope <scope>", "Scope: full_pack, scene_breakdown, character_bible, ultra_image_variation", "full_pack")
+  .option("-u, --ultra", "Ultra mode for maximum variation")
+  .option("-f, --file <screenplay>", "Screenplay file to parse and generate from")
+  .option("-g, --genre <genre>", "Genre for coverage context", "drama")
+  .option("-o, --output <file>", "Save markdown output to file")
   .action(withErrorHandler(async (opts) => {
-    const spin = spinner(`Generating: ${opts.scope}...`);
-    const result = await client.generate(opts.scope, opts.ultra);
+    const provider = opts.provider || "deepseek";
+    const apiKey = opts.key || AIPromptGenerator.resolveApiKey(provider);
+
+    if (!apiKey) {
+      const envVar = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" }[provider];
+      console.error(chalk.red(`No API key for ${provider}.`));
+      console.error(chalk.gray(`  Set ${envVar} environment variable or use --key flag.`));
+      console.error(chalk.gray(`  Or add to .fpsrc: { "apiKeys": { "${provider}": "sk-..." } }`));
+      process.exit(1);
+    }
+
+    // Parse screenplay if file provided (gives better prompts)
+    let parseResult = null;
+    let coverageResult = null;
+    if (opts.file) {
+      if (!fs.existsSync(opts.file)) {
+        console.error(chalk.red(`File not found: ${opts.file}`));
+        process.exit(1);
+      }
+      const spin1 = spinner("Parsing screenplay for context...");
+      parseResult = ScreenplayParser.parse(opts.file);
+      coverageResult = CoverageGenerator.generate(parseResult, opts.genre);
+      spin1.stop(chalk.green(`✓ ${parseResult.stats.totalScenes} scenes, ${coverageResult.totalShots} shots as context`));
+    } else {
+      // Create minimal context
+      parseResult = { scenes: [], characters: [], stats: { totalScenes: 0, totalCharacters: 0, totalDialogueLines: 0, estimatedPages: 0, estimatedDurationMinutes: 0 } };
+      coverageResult = null;
+    }
+
+    const gen = new AIPromptGenerator({ provider, apiKey, model: opts.model, temperature: 0.7 });
+
+    const spin2 = spinner(`Generating ${opts.scope} via ${provider}...`);
+    const result = await gen.generate(parseResult, coverageResult, opts.scope, { ultra: opts.ultra });
+
     if (result.success) {
-      spin.stop(chalk.green(`✓ Generated (${result.model_used})`));
-      if (opts.output && result.markdown) {
+      spin2.stop(chalk.green(`✓ Generated via ${result.providerName} (${result.model})`));
+      console.log(chalk.gray(`   ${result.markdown.length} chars`));
+
+      if (opts.output) {
         fs.writeFileSync(opts.output, result.markdown, "utf-8");
         console.log(chalk.green(`✓ Saved: ${opts.output}`));
+      } else {
+        // Print first 500 chars as preview
+        console.log(chalk.cyan("\n── Preview (first 500 chars) ──\n"));
+        console.log(result.markdown.substring(0, 500));
+        if (result.markdown.length > 500) {
+          console.log(chalk.gray(`\n... (${result.markdown.length - 500} more chars. Use -o to save to file)`));
+        }
       }
     } else {
-      spin.stop(chalk.red(`✗ ${result.error}`));
+      spin2.stop(chalk.red(`✗ ${result.error}`));
     }
   }));
 

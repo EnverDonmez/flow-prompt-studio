@@ -1,6 +1,6 @@
 {
   "name": "flow-prompt-studio",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Screenplay to Google Flow / Veo AI prompt pack generator — CLI, programmatic API, and Claude Code skill",
   "main": "src/index.js",
   "types": "index.d.ts",

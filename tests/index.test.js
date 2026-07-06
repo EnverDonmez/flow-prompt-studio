@@ -61,9 +61,10 @@ describe("FlowPromptStudio", () => {
     restoreFetch();
   });
 
-  it("returns version", () => {
+  it("returns version matching package.json", () => {
     const fps = new FlowPromptStudio("http://test.local/api/v1");
-    assert.equal(fps.version, "1.1.0");
+    const pkg = require("../package.json");
+    assert.equal(fps.version, pkg.version);
   });
 
   it("client property is a FlowPromptStudioClient instance", () => {

@@ -10,6 +10,27 @@ const { CoverageGenerator } = require("../src/coverage");
 
 let originalFetch;
 
+const TEST_ENV_VARS = [
+  "DEEPSEEK_API_KEY",
+  "OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "GEMINI_API_KEY",
+  "GOOGLE_API_KEY",
+  "MISTRAL_API_KEY",
+  "GROQ_API_KEY",
+  "XAI_API_KEY",
+  "COHERE_API_KEY",
+  "PERPLEXITY_API_KEY",
+  "TOGETHER_API_KEY",
+  "OPENROUTER_API_KEY",
+  "CUSTOM_AI_API_KEY",
+  "OPENAI_COMPATIBLE_API_KEY",
+  "CUSTOM_AI_BASE_URL",
+  "OPENAI_COMPATIBLE_BASE_URL",
+  "CUSTOM_AI_MODEL",
+  "OPENAI_COMPATIBLE_MODEL",
+];
+
 function setupFetch(responseFactory) {
   originalFetch = globalThis.fetch;
   globalThis.fetch = responseFactory;
@@ -31,9 +52,9 @@ describe("AIPromptGenerator", () => {
 
   afterEach(() => {
     restoreFetch();
-    delete process.env.DEEPSEEK_API_KEY;
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.ANTHROPIC_API_KEY;
+    TEST_ENV_VARS.forEach((envVar) => {
+      delete process.env[envVar];
+    });
   });
 
   /* ── Constructor ── */
@@ -46,7 +67,7 @@ describe("AIPromptGenerator", () => {
 
     it("throws for unknown provider", () => {
       assert.throws(
-        () => new AIPromptGenerator({ provider: "google", apiKey: "x" }),
+        () => new AIPromptGenerator({ provider: "notreal", apiKey: "x" }),
         /Unknown provider/
       );
     });
@@ -81,6 +102,12 @@ describe("AIPromptGenerator", () => {
       assert.equal(key, "sk-env-test");
     });
 
+    it("reads alias environment variables", () => {
+      process.env.GOOGLE_API_KEY = "google-env-test";
+      const key = AIPromptGenerator.resolveApiKey("gemini");
+      assert.equal(key, "google-env-test");
+    });
+
     it("returns null when not configured", () => {
       const key = AIPromptGenerator.resolveApiKey("openai");
       assert.equal(key, null);
@@ -93,12 +120,12 @@ describe("AIPromptGenerator", () => {
 
   /* ── getProvidersStatus ── */
   describe("getProvidersStatus", () => {
-    it("returns all 3 providers", () => {
+    it("returns all providers", () => {
       const status = AIPromptGenerator.getProvidersStatus();
-      assert.equal(status.length, 3);
-      assert.ok(status.find((s) => s.key === "deepseek"));
-      assert.ok(status.find((s) => s.key === "openai"));
-      assert.ok(status.find((s) => s.key === "anthropic"));
+      assert.equal(status.length, Object.keys(PROVIDERS).length);
+      ["deepseek", "openai", "anthropic", "gemini", "mistral", "groq", "xai", "cohere", "perplexity", "together", "openrouter", "custom"].forEach((key) => {
+        assert.ok(status.find((s) => s.key === key), `${key} should be listed`);
+      });
     });
 
     it("reports correct configured status", () => {
@@ -158,6 +185,26 @@ describe("AIPromptGenerator", () => {
       assert.ok(capturedBody.messages[1].content.includes("MARY"));
     });
 
+    it("uses explicit API key without requiring env vars", async () => {
+      let capturedAuth = null;
+
+      setupFetch(async (_url, init) => {
+        capturedAuth = init.headers.Authorization;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ choices: [{ message: { content: "Explicit key output" } }] }),
+        };
+      });
+
+      const gen = new AIPromptGenerator({ provider: "openai", apiKey: "sk-explicit" });
+      const result = await gen.generate(parseResult, null, "scene_breakdown");
+
+      assert.equal(result.success, true);
+      assert.equal(result.markdown, "Explicit key output");
+      assert.equal(capturedAuth, "Bearer sk-explicit");
+    });
+
     it("handles 401 authentication error", async () => {
       process.env.OPENAI_API_KEY = "sk-bad";
       setupFetch(async () => ({
@@ -211,6 +258,94 @@ describe("AIPromptGenerator", () => {
       assert.equal(capturedBody.messages[0].role, "user");
     });
 
+    it("supports gemini provider format", async () => {
+      process.env.GEMINI_API_KEY = "gemini-test";
+      let capturedUrl = null;
+      let capturedBody = null;
+
+      setupFetch(async (url, init) => {
+        capturedUrl = url;
+        capturedBody = JSON.parse(init.body);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ candidates: [{ content: { parts: [{ text: "Gemini output" }] } }] }),
+        };
+      });
+
+      const gen = new AIPromptGenerator({ provider: "gemini", apiKey: "gemini-test", model: "gemini-test-model" });
+      const result = await gen.generate(parseResult, null, "character_bible");
+
+      assert.equal(result.success, true);
+      assert.equal(result.markdown, "Gemini output");
+      assert.ok(capturedUrl.includes("/models/gemini-test-model:generateContent"));
+      assert.ok(capturedUrl.includes("key=gemini-test"));
+      assert.ok(capturedBody.system_instruction.parts[0].text);
+      assert.equal(capturedBody.contents[0].role, "user");
+      assert.ok(capturedBody.generationConfig.maxOutputTokens);
+    });
+
+    it("supports cohere provider format", async () => {
+      process.env.COHERE_API_KEY = "cohere-test";
+      let capturedBody = null;
+      let capturedAuth = null;
+
+      setupFetch(async (_url, init) => {
+        capturedAuth = init.headers.Authorization;
+        capturedBody = JSON.parse(init.body);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ message: { content: [{ text: "Cohere output" }] } }),
+        };
+      });
+
+      const gen = new AIPromptGenerator({ provider: "cohere", apiKey: "cohere-test" });
+      const result = await gen.generate(parseResult, null, "scene_breakdown");
+
+      assert.equal(result.success, true);
+      assert.equal(result.markdown, "Cohere output");
+      assert.equal(capturedAuth, "Bearer cohere-test");
+      assert.equal(capturedBody.messages[0].role, "system");
+      assert.equal(capturedBody.messages[1].role, "user");
+    });
+
+    it("supports custom OpenAI-compatible endpoint", async () => {
+      let capturedUrl = null;
+      let capturedBody = null;
+
+      setupFetch(async (url, init) => {
+        capturedUrl = url;
+        capturedBody = JSON.parse(init.body);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ choices: [{ message: { content: "Custom output" } }] }),
+        };
+      });
+
+      const gen = new AIPromptGenerator({
+        provider: "custom",
+        apiKey: "custom-key",
+        baseUrl: "http://localhost:1234/v1",
+        model: "local-model",
+      });
+      const result = await gen.generate(parseResult, null, "full_pack");
+
+      assert.equal(result.success, true);
+      assert.equal(result.markdown, "Custom output");
+      assert.equal(capturedUrl, "http://localhost:1234/v1/chat/completions");
+      assert.equal(capturedBody.model, "local-model");
+    });
+
+    it("requires base URL for custom provider", async () => {
+      const gen = new AIPromptGenerator({ provider: "custom", apiKey: "custom-key" });
+      await assert.rejects(
+        () => gen.generate(parseResult, null, "full_pack"),
+        /No base URL/
+      );
+    });
+
     it("all prompts include screenplay context", () => {
       Object.entries(PROMPTS).forEach(([scope, prompt]) => {
         const userContent = prompt.buildUser(parseResult, coverageResult, {});
@@ -256,16 +391,18 @@ describe("AIPromptGenerator", () => {
     it("all providers have required fields", () => {
       Object.entries(PROVIDERS).forEach(([key, p]) => {
         assert.ok(p.name, `${key}: name`);
-        assert.ok(p.endpoint, `${key}: endpoint`);
+        assert.ok(p.endpoint || p.requiresBaseUrl, `${key}: endpoint`);
         assert.ok(p.model, `${key}: model`);
+        assert.ok(Array.isArray(p.envVars), `${key}: envVars`);
+        assert.ok(p.envVars.length > 0, `${key}: envVars length`);
         assert.equal(typeof p.headers, "function", `${key}: headers fn`);
         assert.equal(typeof p.buildBody, "function", `${key}: buildBody fn`);
         assert.equal(typeof p.parseResponse, "function", `${key}: parseResponse fn`);
       });
     });
 
-    it("deepseek and openai use Authorization header", () => {
-      ["deepseek", "openai"].forEach((k) => {
+    it("OpenAI-compatible providers use Authorization header", () => {
+      ["deepseek", "openai", "mistral", "groq", "xai", "cohere", "perplexity", "together", "openrouter", "custom"].forEach((k) => {
         const headers = PROVIDERS[k].headers("sk-test");
         assert.ok(headers.Authorization === "Bearer sk-test");
       });

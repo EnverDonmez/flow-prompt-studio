@@ -113,7 +113,7 @@ fps template --list             # Browse all 7 genres
 
 ## 🤖 AI Generation (optional)
 
-Three AI providers built-in. Set an env var and go:
+11 popular AI providers plus any OpenAI-compatible endpoint. Set an env var and go:
 
 ```bash
 # DeepSeek (cheapest, best value)
@@ -127,7 +127,36 @@ fps generate -f script.txt -p openai --model gpt-4o
 # Claude
 export ANTHROPIC_API_KEY=sk-ant-...
 fps generate -f script.txt -p anthropic
+
+# Google Gemini
+export GEMINI_API_KEY=...
+fps generate -f script.txt -p gemini
+
+# OpenRouter
+export OPENROUTER_API_KEY=sk-or-...
+fps generate -f script.txt -p openrouter --model openai/gpt-4o
+
+# Custom OpenAI-compatible endpoint (local/self-hosted/vendor proxy)
+fps generate -f script.txt -p custom \
+  --base-url http://localhost:1234/v1 \
+  --model local-model \
+  --key local-key
 ```
+
+| Provider | CLI key | Env var |
+|----------|---------|---------|
+| DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
+| OpenAI | `openai` | `OPENAI_API_KEY` |
+| Anthropic / Claude | `anthropic` | `ANTHROPIC_API_KEY` |
+| Google Gemini | `gemini` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
+| Mistral AI | `mistral` | `MISTRAL_API_KEY` |
+| Groq | `groq` | `GROQ_API_KEY` |
+| xAI / Grok | `xai` | `XAI_API_KEY` |
+| Cohere | `cohere` | `COHERE_API_KEY` |
+| Perplexity | `perplexity` | `PERPLEXITY_API_KEY` |
+| Together AI | `together` | `TOGETHER_API_KEY` |
+| OpenRouter | `openrouter` | `OPENROUTER_API_KEY` |
+| Custom OpenAI-compatible | `custom` | `CUSTOM_AI_API_KEY` or `OPENAI_COMPATIBLE_API_KEY` |
 
 4 prompt scopes: `full_pack` (13 sections), `scene_breakdown`, `character_bible`, `ultra_image_variation`
 
@@ -171,7 +200,7 @@ fps.exportShotPlan(plan, 'html', './output/');
 const gen = await fps.generate(result, plan, 'full_pack',
   { provider: 'deepseek', apiKey: process.env.DEEPSEEK_API_KEY });
 
-// 218 tests. Offline-first core.
+// 224 tests. Offline-first core.
 ```
 
 ---
@@ -182,7 +211,7 @@ Flow Prompt Studio keeps the core workflow local:
 
 - `parse`, `shots`, `callsheet`, `budget`, `convert`, `export`, `analyze-script`, and `demo` do not send screenplay content over the network.
 - `storyboard` sends generated image prompts to Pollinations.ai only when you request image generation.
-- `generate` and `workflow --ai` send screenplay-derived context to the AI provider you choose: DeepSeek, OpenAI, or Anthropic.
+- `generate` and `workflow --ai` send screenplay-derived context to the AI provider you choose: DeepSeek, OpenAI, Anthropic, Gemini, Mistral, Groq, xAI, Cohere, Perplexity, Together AI, OpenRouter, or your custom OpenAI-compatible endpoint.
 - API keys are read from CLI flags, environment variables, `.env`, or `.fpsrc`; they are not printed in CLI output.
 
 ---

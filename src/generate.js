@@ -1,7 +1,7 @@
 /**
  * Flow Prompt Studio — Native AI Prompt Generator
  *
- * Direct API calls to DeepSeek, OpenAI, and Anthropic.
+ * Direct API calls to major AI providers.
  * No Python backend needed. Works with just an API key.
  *
  * Usage:
@@ -11,45 +11,53 @@
 
 /* ─── Provider Configurations ─── */
 
+const openAIChatBody = (model, messages, options) => ({
+  model,
+  messages,
+  temperature: options.temperature ?? 0.7,
+  max_tokens: options.maxTokens ?? 4096,
+});
+
+const parseOpenAIChatResponse = (data) => data.choices?.[0]?.message?.content || "";
+
+const bearerHeaders = (apiKey) => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${apiKey}`,
+});
+
+const openAICompatible = ({ name, endpoint, model, envVars, baseUrlEnvVars = [], modelEnvVars = [], requiresBaseUrl = false }) => ({
+  name,
+  endpoint,
+  model,
+  envVars,
+  baseUrlEnvVars,
+  modelEnvVars,
+  requiresBaseUrl,
+  headers: bearerHeaders,
+  buildBody: openAIChatBody,
+  parseResponse: parseOpenAIChatResponse,
+});
+
 const PROVIDERS = {
-  deepseek: {
+  deepseek: openAICompatible({
     name: "DeepSeek",
     endpoint: "https://api.deepseek.com/v1/chat/completions",
     model: "deepseek-chat",
-    headers: (apiKey) => ({
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    }),
-    buildBody: (model, messages, options) => ({
-      model,
-      messages,
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 4096,
-    }),
-    parseResponse: (data) => data.choices?.[0]?.message?.content || "",
-  },
+    envVars: ["DEEPSEEK_API_KEY"],
+  }),
 
-  openai: {
+  openai: openAICompatible({
     name: "OpenAI",
     endpoint: "https://api.openai.com/v1/chat/completions",
     model: "gpt-4o",
-    headers: (apiKey) => ({
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    }),
-    buildBody: (model, messages, options) => ({
-      model,
-      messages,
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 4096,
-    }),
-    parseResponse: (data) => data.choices?.[0]?.message?.content || "",
-  },
+    envVars: ["OPENAI_API_KEY"],
+  }),
 
   anthropic: {
     name: "Anthropic",
     endpoint: "https://api.anthropic.com/v1/messages",
     model: "claude-sonnet-4-20250514",
+    envVars: ["ANTHROPIC_API_KEY"],
     headers: (apiKey) => ({
       "Content-Type": "application/json",
       "x-api-key": apiKey,
@@ -69,6 +77,99 @@ const PROVIDERS = {
     },
     parseResponse: (data) => data.content?.[0]?.text || "",
   },
+
+  gemini: {
+    name: "Google Gemini",
+    endpoint: ({ apiKey, model }) => `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    model: "gemini-1.5-pro",
+    envVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+    headers: () => ({
+      "Content-Type": "application/json",
+    }),
+    buildBody: (model, messages, options) => {
+      const systemMsg = messages.find((m) => m.role === "system");
+      const userMsgs = messages.filter((m) => m.role !== "system");
+      return {
+        system_instruction: systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined,
+        contents: userMsgs.map((m) => ({
+          role: "user",
+          parts: [{ text: m.content }],
+        })),
+        generationConfig: {
+          temperature: options.temperature ?? 0.7,
+          maxOutputTokens: options.maxTokens ?? 4096,
+        },
+      };
+    },
+    parseResponse: (data) => (data.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join(""),
+  },
+
+  mistral: openAICompatible({
+    name: "Mistral AI",
+    endpoint: "https://api.mistral.ai/v1/chat/completions",
+    model: "mistral-large-latest",
+    envVars: ["MISTRAL_API_KEY"],
+  }),
+
+  groq: openAICompatible({
+    name: "Groq",
+    endpoint: "https://api.groq.com/openai/v1/chat/completions",
+    model: "llama-3.3-70b-versatile",
+    envVars: ["GROQ_API_KEY"],
+  }),
+
+  xai: openAICompatible({
+    name: "xAI",
+    endpoint: "https://api.x.ai/v1/chat/completions",
+    model: "grok-3",
+    envVars: ["XAI_API_KEY"],
+  }),
+
+  cohere: {
+    name: "Cohere",
+    endpoint: "https://api.cohere.com/v2/chat",
+    model: "command-r-plus",
+    envVars: ["COHERE_API_KEY"],
+    headers: bearerHeaders,
+    buildBody: (model, messages, options) => ({
+      model,
+      messages,
+      temperature: options.temperature ?? 0.7,
+      max_tokens: options.maxTokens ?? 4096,
+    }),
+    parseResponse: (data) => (data.message?.content || []).map((p) => p.text || "").join("") || data.text || "",
+  },
+
+  perplexity: openAICompatible({
+    name: "Perplexity",
+    endpoint: "https://api.perplexity.ai/chat/completions",
+    model: "sonar-pro",
+    envVars: ["PERPLEXITY_API_KEY"],
+  }),
+
+  together: openAICompatible({
+    name: "Together AI",
+    endpoint: "https://api.together.xyz/v1/chat/completions",
+    model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    envVars: ["TOGETHER_API_KEY"],
+  }),
+
+  openrouter: openAICompatible({
+    name: "OpenRouter",
+    endpoint: "https://openrouter.ai/api/v1/chat/completions",
+    model: "openai/gpt-4o",
+    envVars: ["OPENROUTER_API_KEY"],
+  }),
+
+  custom: openAICompatible({
+    name: "Custom OpenAI-compatible",
+    endpoint: null,
+    model: "custom-model",
+    envVars: ["CUSTOM_AI_API_KEY", "OPENAI_COMPATIBLE_API_KEY"],
+    baseUrlEnvVars: ["CUSTOM_AI_BASE_URL", "OPENAI_COMPATIBLE_BASE_URL"],
+    modelEnvVars: ["CUSTOM_AI_MODEL", "OPENAI_COMPATIBLE_MODEL"],
+    requiresBaseUrl: true,
+  }),
 };
 
 /* ─── Prompt Templates ─── */
@@ -207,64 +308,87 @@ Output structured by scene, with clear labels for each variation type.`;
 class AIPromptGenerator {
   /**
    * @param {object} options
-   * @param {string} options.provider - "deepseek" | "openai" | "anthropic"
+   * @param {string} options.provider - AI provider key
    * @param {string} options.apiKey - API key for the provider
    * @param {string} [options.model] - Override default model
+   * @param {string} [options.baseUrl] - Override endpoint/base URL for custom OpenAI-compatible providers
    * @param {number} [options.temperature] - 0-2, default 0.7
    * @param {number} [options.maxTokens] - Default 4096
    */
   constructor(options = {}) {
     this.provider = options.provider || "deepseek";
-    this.apiKey = this._sanitizeKey(options.apiKey || "");
-    this.model = options.model || null;
-    this.temperature = options.temperature ?? 0.7;
-    this.maxTokens = options.maxTokens ?? 4096;
-
     if (!PROVIDERS[this.provider]) {
       throw new Error(`Unknown provider: ${this.provider}. Available: ${Object.keys(PROVIDERS).join(", ")}`);
     }
+
+    this._apiKey = options.apiKey || "";
+    this.apiKey = this._sanitizeKey(this._apiKey);
+    this.model = options.model || AIPromptGenerator.resolveModel(this.provider) || null;
+    this.baseUrl = options.baseUrl || AIPromptGenerator.resolveBaseUrl(this.provider) || null;
+    this.temperature = options.temperature ?? 0.7;
+    this.maxTokens = options.maxTokens ?? 4096;
   }
 
   /**
    * Resolve API key from multiple sources.
-   * Order: explicit key → env var → .fpsrc → .env file
+   * Order: env var → .env file → .fpsrc
    */
   static resolveApiKey(provider) {
-    const envMap = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" };
-    const envVar = envMap[provider];
-    if (!envVar) return null;
+    const config = PROVIDERS[provider];
+    if (!config) return null;
 
-    // 1. Environment variable
-    if (process.env[envVar]) return process.env[envVar];
+    const envKey = AIPromptGenerator._resolveEnvVars(config.envVars || []);
+    if (envKey) return envKey;
 
-    // 2. .env file in cwd
     try {
-      const fs = require("fs");
-      const path = require("path");
-      const envPath = path.join(process.cwd(), ".env");
-      if (fs.existsSync(envPath)) {
-        const content = fs.readFileSync(envPath, "utf-8");
-        const match = content.match(new RegExp(`^${envVar}\\s*=\\s*(.+)$`, "m"));
-        if (match) return match[1].replace(/["']/g, "").trim();
-      }
-    } catch {
-      // Ignore malformed or unreadable local env files and continue with other key sources.
-    }
-
-    // 3. .fpsrc config
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const rcPath = path.join(process.cwd(), ".fpsrc");
-      if (fs.existsSync(rcPath)) {
-        const config = JSON.parse(fs.readFileSync(rcPath, "utf-8"));
-        if (config.apiKeys && config.apiKeys[provider]) return config.apiKeys[provider];
-      }
+      const rc = AIPromptGenerator._readProjectConfig();
+      const providerConfig = rc.ai?.providers?.[provider] || {};
+      if (providerConfig.apiKey) return providerConfig.apiKey;
+      if (providerConfig.apiKeyEnv && process.env[providerConfig.apiKeyEnv]) return process.env[providerConfig.apiKeyEnv];
+      if (rc.apiKeys && rc.apiKeys[provider]) return rc.apiKeys[provider];
     } catch {
       // Ignore malformed or unreadable project config and report missing key below.
     }
 
     return null;
+  }
+
+  static resolveBaseUrl(provider) {
+    const config = PROVIDERS[provider];
+    if (!config) return null;
+
+    const envValue = AIPromptGenerator._resolveEnvVars(config.baseUrlEnvVars || []);
+    if (envValue) return envValue;
+
+    try {
+      const rc = AIPromptGenerator._readProjectConfig();
+      return rc.ai?.providers?.[provider]?.baseUrl || rc.baseUrls?.[provider] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static resolveModel(provider) {
+    const config = PROVIDERS[provider];
+    if (!config) return null;
+
+    const envValue = AIPromptGenerator._resolveEnvVars(config.modelEnvVars || []);
+    if (envValue) return envValue;
+
+    try {
+      const rc = AIPromptGenerator._readProjectConfig();
+      return rc.ai?.providers?.[provider]?.model || rc.models?.[provider] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static getProvider(provider) {
+    return PROVIDERS[provider] || null;
+  }
+
+  static getProviderEnvVars(provider) {
+    return PROVIDERS[provider]?.envVars || [];
   }
 
   /**
@@ -276,8 +400,62 @@ class AIPromptGenerator {
       name: p.name,
       model: p.model,
       configured: !!AIPromptGenerator.resolveApiKey(key),
-      envVar: { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" }[key],
+      envVar: (p.envVars || [])[0],
+      envVars: p.envVars || [],
+      requiresBaseUrl: !!p.requiresBaseUrl,
+      baseUrlConfigured: !!AIPromptGenerator.resolveBaseUrl(key),
     }));
+  }
+
+  static _readProjectConfig() {
+    const fs = require("fs");
+    const path = require("path");
+    const rcPath = path.join(process.cwd(), ".fpsrc");
+    if (!fs.existsSync(rcPath)) return {};
+    return JSON.parse(fs.readFileSync(rcPath, "utf-8"));
+  }
+
+  static _readDotEnv() {
+    const fs = require("fs");
+    const path = require("path");
+    const envPath = path.join(process.cwd(), ".env");
+    if (!fs.existsSync(envPath)) return {};
+
+    const values = {};
+    const content = fs.readFileSync(envPath, "utf-8");
+    content.split(/\r?\n/).forEach((line) => {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (!match) return;
+      values[match[1]] = match[2].replace(/^["']|["']$/g, "").trim();
+    });
+    return values;
+  }
+
+  static _resolveEnvVars(envVars) {
+    for (const envVar of envVars) {
+      if (process.env[envVar]) return process.env[envVar];
+    }
+
+    try {
+      const dotEnv = AIPromptGenerator._readDotEnv();
+      for (const envVar of envVars) {
+        if (dotEnv[envVar]) return dotEnv[envVar];
+      }
+    } catch {
+      // Ignore malformed or unreadable local env files.
+    }
+
+    return null;
+  }
+
+  static _normalizeChatEndpoint(baseUrl) {
+    if (!baseUrl) return null;
+    const trimmed = baseUrl.replace(/\/+$/, "");
+    if (/\/chat\/completions$/i.test(trimmed)) return trimmed;
+    if (/\/v\d+$/i.test(trimmed) || /\/openai\/v\d+$/i.test(trimmed) || /\/api\/v\d+$/i.test(trimmed)) {
+      return `${trimmed}/chat/completions`;
+    }
+    return `${trimmed}/v1/chat/completions`;
   }
 
   /**
@@ -293,13 +471,28 @@ class AIPromptGenerator {
    * Get the real API key (unsanitized) from the stored key or environment.
    */
   _getRealKey() {
+    if (this._apiKey) return this._apiKey;
     // If key was provided directly and looks like a real key (not sanitized)
-    const envMap = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" };
-    const directKey = process.env[envMap[this.provider]] || AIPromptGenerator.resolveApiKey(this.provider);
-    if (directKey) return directKey;
-
-    // The key stored in this.apiKey might be sanitized — try to get real one
     return AIPromptGenerator.resolveApiKey(this.provider) || "";
+  }
+
+  _getEndpoint(provider, realKey, model) {
+    if (this.baseUrl) {
+      return AIPromptGenerator._normalizeChatEndpoint(this.baseUrl);
+    }
+
+    if (provider.requiresBaseUrl) {
+      throw new Error(
+        `No base URL for ${provider.name}. Use --base-url, set ${(provider.baseUrlEnvVars || []).join(" or ")}, ` +
+        `or add .fpsrc ai.providers.${this.provider}.baseUrl.`
+      );
+    }
+
+    if (typeof provider.endpoint === "function") {
+      return provider.endpoint({ apiKey: realKey, model });
+    }
+
+    return provider.endpoint;
   }
 
   /**
@@ -320,9 +513,9 @@ class AIPromptGenerator {
     const realKey = this._getRealKey();
 
     if (!realKey) {
-      const envVar = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" }[this.provider];
+      const envVars = provider.envVars || [];
       throw new Error(
-        `No API key for ${provider.name}. Set ${envVar} environment variable, ` +
+        `No API key for ${provider.name}. Set ${envVars.join(" or ")} environment variable, ` +
         `use --key flag, or add to .fpsrc config.`
       );
     }
@@ -336,12 +529,13 @@ class AIPromptGenerator {
       temperature: this.temperature,
       maxTokens: this.maxTokens,
     });
+    const endpoint = this._getEndpoint(provider, realKey, model);
 
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 120_000);
 
-      const res = await fetch(provider.endpoint, {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: provider.headers(realKey),
         body: JSON.stringify(body),

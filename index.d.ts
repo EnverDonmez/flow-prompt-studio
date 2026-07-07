@@ -1,4 +1,4 @@
-// TypeScript types for flow-prompt-studio v2.5
+// TypeScript types for flow-prompt-studio v2.6
 // Minimum TypeScript version: 4.5+
 
 /* ─── Screenplay Parser ─── */
@@ -104,13 +104,26 @@ export class FileExporter {
 
 /* ─── AI Prompt Generation ─── */
 
-export type AIProvider = "deepseek" | "openai" | "anthropic";
+export type AIProvider =
+  | "deepseek"
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "mistral"
+  | "groq"
+  | "xai"
+  | "cohere"
+  | "perplexity"
+  | "together"
+  | "openrouter"
+  | "custom";
 export type PromptScope = "full_pack" | "scene_breakdown" | "character_bible" | "ultra_image_variation";
 
 export interface AIGenerateOptions {
   provider?: AIProvider;
   apiKey?: string;
   model?: string;
+  baseUrl?: string;
   temperature?: number;
   maxTokens?: number;
   ultra?: boolean;
@@ -122,6 +135,9 @@ export interface AIProviderStatus {
   model: string;
   configured: boolean;
   envVar: string;
+  envVars: string[];
+  requiresBaseUrl: boolean;
+  baseUrlConfigured: boolean;
 }
 
 export interface AIGenerateResult {
@@ -138,9 +154,14 @@ export class AIPromptGenerator {
   provider: AIProvider;
   apiKey: string;
   model: string | null;
+  baseUrl: string | null;
   temperature: number;
   maxTokens: number;
   static resolveApiKey(provider: AIProvider): string | null;
+  static resolveBaseUrl(provider: AIProvider): string | null;
+  static resolveModel(provider: AIProvider): string | null;
+  static getProvider(provider: AIProvider): any;
+  static getProviderEnvVars(provider: AIProvider): string[];
   static getProvidersStatus(): AIProviderStatus[];
   generate(parseResult: ParseResult, coverageResult: CoverageResult, scope?: PromptScope, options?: AIGenerateOptions): Promise<AIGenerateResult>;
 }

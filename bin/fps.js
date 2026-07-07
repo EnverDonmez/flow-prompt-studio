@@ -74,6 +74,15 @@ function writeTextFile(filePath, content) {
   return filePath;
 }
 
+function providerEnvLabel(provider) {
+  const envVars = AIPromptGenerator.getProviderEnvVars(provider);
+  return envVars.length ? envVars.join(" or ") : "provider API key env var";
+}
+
+function providerListLabel() {
+  return AIPromptGenerator.getProvidersStatus().map((p) => p.key).join(", ");
+}
+
 program
   .name("fps")
   .description("Offline-first screenplay parser & shot coverage generator — no backend required")
@@ -821,8 +830,10 @@ program
     const providers = AIPromptGenerator.getProvidersStatus();
     providers.forEach((p) => {
       const icon = p.configured ? chalk.green("✓") : chalk.gray("✗");
-      const status = p.configured ? `configured (${p.envVar})` : `not configured (set ${p.envVar})`;
-      console.log(`   ${icon} ${p.name.padEnd(12)} ${status}`);
+      const envLabel = p.envVars.join(" or ");
+      const baseUrlNote = p.requiresBaseUrl && !p.baseUrlConfigured ? "; set --base-url or CUSTOM_AI_BASE_URL" : "";
+      const status = p.configured ? `configured (${p.envVar})` : `not configured (set ${envLabel}${baseUrlNote})`;
+      console.log(`   ${icon} ${p.name.padEnd(25)} ${status}`);
     });
 
     console.log(chalk.gray("\n   Set API keys via environment variables, --key flag, or .fpsrc config."));
@@ -853,9 +864,11 @@ program
   .command("workflow <screenplay>")
   .description("Full workflow: local parse + shot plan + optional AI (if backend available)")
   .option("-g, --genre <genre>", "Coverage genre", "drama")
-  .option("--ai", "Also run AI generation (DeepSeek/OpenAI/Claude — no backend needed)")
+  .option("--ai", "Also run AI generation (multi-provider — no backend needed)")
   .option("-p, --provider <provider>", "AI provider for --ai", "deepseek")
   .option("-k, --key <key>", "API key for AI provider")
+  .option("--base-url <url>", "Custom/OpenAI-compatible chat completions base URL")
+  .option("-m, --model <model>", "AI model override")
   .option("--ultra", "Ultra mode for AI generation")
   .option("--dry-run", "Estimate first, then run")
   .option("-o, --output <dir>", "Export output directory")
@@ -904,16 +917,21 @@ program
       console.log(chalk.cyan("\n🤖 Phase 2: AI Generation\n"));
 
       const provider = opts.provider || "deepseek";
+      if (!AIPromptGenerator.getProvider(provider)) {
+        console.log(chalk.yellow(`  ⚠ Unknown AI provider: ${provider} — skipping AI generation`));
+        console.log(chalk.gray(`    Available providers: ${providerListLabel()}`));
+        return;
+      }
+
       const apiKey = opts.key || AIPromptGenerator.resolveApiKey(provider);
 
       if (!apiKey) {
         console.log(chalk.yellow(`  ⚠ No API key for ${provider} — skipping AI generation`));
-        const envVar = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" }[provider];
-        console.log(chalk.gray(`    Set ${envVar} or use --key flag`));
+        console.log(chalk.gray(`    Set ${providerEnvLabel(provider)} or use --key flag`));
       } else {
         const spin4 = spinner("  Generating AI prompt pack...");
         try {
-          const gen = new AIPromptGenerator({ provider, apiKey });
+          const gen = new AIPromptGenerator({ provider, apiKey, baseUrl: opts.baseUrl, model: opts.model });
           const genResult = await gen.generate(parseResult, coverageResult, "full_pack", { ultra: opts.ultra || false });
           if (genResult.success) {
             spin4.stop(chalk.green(`  ✓ AI generation complete (${genResult.providerName} / ${genResult.model})`));
@@ -935,7 +953,7 @@ program
     console.log(chalk.green(`\n🎬 Workflow complete in ${elapsed}s`));
     console.log(chalk.gray(`   ${stats.totalScenes} scenes → ${coverageResult.totalShots} shots → ${outputDir}/`));
     if (!opts.ai) {
-      console.log(chalk.gray(`\n   Tip: Add --ai to also generate AI prompts (DeepSeek/OpenAI/Claude)`));
+      console.log(chalk.gray(`\n   Tip: Add --ai to also generate AI prompts (${providerListLabel()})`));
     }
   }));
 
@@ -997,10 +1015,11 @@ program
 
 program
   .command("generate")
-  .description("Generate AI prompt pack (DeepSeek, OpenAI, Claude — no backend needed)")
-  .option("-p, --provider <provider>", "AI provider: deepseek, openai, anthropic", "deepseek")
+  .description("Generate AI prompt pack (multi-provider — no backend needed)")
+  .option("-p, --provider <provider>", "AI provider (run 'fps config' to list)", "deepseek")
   .option("-k, --key <key>", "API key (or set env var)")
   .option("-m, --model <model>", "Model override")
+  .option("--base-url <url>", "Custom/OpenAI-compatible chat completions base URL")
   .option("-s, --scope <scope>", "Scope: full_pack, scene_breakdown, character_bible, ultra_image_variation", "full_pack")
   .option("-u, --ultra", "Ultra mode for maximum variation")
   .option("-f, --file <screenplay>", "Screenplay file to parse and generate from")
@@ -1008,12 +1027,17 @@ program
   .option("-o, --output <file>", "Save markdown output to file")
   .action(withErrorHandler(async (opts) => {
     const provider = opts.provider || "deepseek";
+    if (!AIPromptGenerator.getProvider(provider)) {
+      console.error(chalk.red(`Unknown AI provider: ${provider}.`));
+      console.error(chalk.gray(`  Available providers: ${providerListLabel()}`));
+      process.exit(1);
+    }
+
     const apiKey = opts.key || AIPromptGenerator.resolveApiKey(provider);
 
     if (!apiKey) {
-      const envVar = { deepseek: "DEEPSEEK_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" }[provider];
       console.error(chalk.red(`No API key for ${provider}.`));
-      console.error(chalk.gray(`  Set ${envVar} environment variable or use --key flag.`));
+      console.error(chalk.gray(`  Set ${providerEnvLabel(provider)} environment variable or use --key flag.`));
       console.error(chalk.gray(`  Or add to .fpsrc: { "apiKeys": { "${provider}": "sk-..." } }`));
       process.exit(1);
     }
@@ -1036,7 +1060,7 @@ program
       coverageResult = null;
     }
 
-    const gen = new AIPromptGenerator({ provider, apiKey, model: opts.model, temperature: 0.7 });
+    const gen = new AIPromptGenerator({ provider, apiKey, model: opts.model, baseUrl: opts.baseUrl, temperature: 0.7 });
 
     const spin2 = spinner(`Generating ${opts.scope} via ${provider}...`);
     const result = await gen.generate(parseResult, coverageResult, opts.scope, { ultra: opts.ultra });

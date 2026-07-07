@@ -2,6 +2,21 @@
 
 All notable changes to Flow Prompt Studio.
 
+## [2.6.0] — 2026-07-07
+
+### Added
+- Expanded native AI generation from 3 providers to 11 major providers plus custom OpenAI-compatible endpoints.
+- Added provider support for Google Gemini, Mistral AI, Groq, xAI, Cohere, Perplexity, Together AI, and OpenRouter.
+- Added `--base-url` and `--model` support for `fps workflow --ai`, and `--base-url` support for `fps generate`.
+- Added `.fpsrc` support for `ai.providers.<provider>.apiKey`, `baseUrl`, and `model` overrides.
+
+### Changed
+- `fps config` now lists all AI providers with their configured status and accepted environment variable names.
+- TypeScript declarations and README examples now cover the expanded AI provider matrix.
+
+### Fixed
+- Direct `--key` values are now preserved internally for API calls while still being sanitized for display.
+
 ## [2.5.2] — 2026-07-07
 
 ### Fixed

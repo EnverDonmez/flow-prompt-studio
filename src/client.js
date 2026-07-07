@@ -77,7 +77,7 @@ class FlowPromptStudioClient {
    */
   async ping() {
     try {
-      const res = await this._request("/config", { _skipCache: true });
+      await this._request("/config", { _skipCache: true });
       return { reachable: true };
     } catch (err) {
       return { reachable: false, error: err.message };
@@ -176,28 +176,30 @@ class FlowPromptStudioClient {
         break;
 
       } catch (fetchErr) {
+        let requestError = fetchErr;
+
         // Timeout AbortError
-        if (fetchErr.name === "AbortError" && !options.signal?.aborted) {
-          fetchErr = new Error(`Request timed out after ${retryConfig.timeoutMs}ms`);
-          fetchErr.status = 0;
+        if (requestError.name === "AbortError" && !options.signal?.aborted) {
+          requestError = new Error(`Request timed out after ${retryConfig.timeoutMs}ms`);
+          requestError.status = 0;
         }
 
         // Retryable network error?
-        if (this._isRetryable(fetchErr, fetchErr.status || 0) && attempt <= retryConfig.maxRetries) {
+        if (this._isRetryable(requestError, requestError.status || 0) && attempt <= retryConfig.maxRetries) {
           const delay = Math.min(
             retryConfig.initialDelayMs * Math.pow(retryConfig.backoffMultiplier, attempt - 1),
             retryConfig.maxDelayMs
           );
           console.warn(
-            `[fps] Network error (${fetchErr.message}), attempt ${attempt}/${retryConfig.maxRetries + 1} — waiting ${delay}ms...`
+            `[fps] Network error (${requestError.message}), attempt ${attempt}/${retryConfig.maxRetries + 1} — waiting ${delay}ms...`
           );
           await this._sleep(delay);
-          lastError = fetchErr;
+          lastError = requestError;
           continue;
         }
 
         // Wrap connection errors with helpful messages
-        if (fetchErr.message?.includes("ECONNREFUSED") || fetchErr.message?.includes("fetch failed")) {
+        if (requestError.message?.includes("ECONNREFUSED") || requestError.message?.includes("fetch failed")) {
           const helpful = new Error(
             `Cannot connect to Flow Prompt Studio backend at ${this.baseUrl}\n` +
             `  Make sure the backend is running. Check with: fps config`
@@ -206,7 +208,7 @@ class FlowPromptStudioClient {
           throw helpful;
         }
 
-        lastError = fetchErr;
+        lastError = requestError;
         break;
       }
     }

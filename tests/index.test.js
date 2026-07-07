@@ -13,7 +13,7 @@ const os = require("os");
 let originalFetch;
 
 function mockFetch(response) {
-  return async (...args) => {
+  return async () => {
     return {
       ok: response.ok ?? true,
       status: response.status ?? 200,

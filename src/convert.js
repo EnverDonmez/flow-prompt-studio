@@ -43,7 +43,6 @@ class FormatConverter {
     // Convert to output format
     switch (outExt) {
       case "fountain":
-      case "fountain":
         return this._toFountain(parseResult, outputPath);
       case "fdx":
       case "xml":

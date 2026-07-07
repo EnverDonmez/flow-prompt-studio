@@ -14,7 +14,7 @@ const path = require("path");
 
 const SCENE_PATTERNS = [
   // Standard screenplay format: INT./EXT. or INT/EXT
-  /^(INT\.|EXT\.|INT\/EXT|EXT\/INT|I\/E|E\/I)[\.\s-]+(.+)$/im,
+  /^(INT\.|EXT\.|INT\/EXT|EXT\/INT|I\/E|E\/I)[.\s-]+(.+)$/im,
   // Numbered scenes: SCENE 1, SCENE: 1, SCÈNE 1
   /^(SCENE|SCÈNE|SCENA|SZENE|BÖLÜM|CHAPTER|REEL|ACT)\s*[:.\-—]?\s*(\d+)\s*[:.\-—]?\s*(.*)$/im,
   // Fountain format: # Section, ## Scene
@@ -29,17 +29,6 @@ const SCENE_PATTERNS = [
 const CHARACTER_LINE = /^[A-ZÀ-Ü][A-ZÀ-Ü\s'\-().]{1,30}[A-ZÀ-Ü]$/;
 // More permissive: ALL CAPS name followed by dialogue in parentheses or next line
 const CHARACTER_PAREN = /^([A-ZÀ-Ü][A-ZÀ-Ü\s'\-().]{1,30}[A-ZÀ-Ü])\s*\(([^)]+)\)\s*$/;
-
-/* ─── Dialogue Detection ─── */
-
-// Dialogue lines: text following a character name line (not ALL CAPS, not empty, not scene marker)
-const DIALOGUE_LINE = /^[^A-Z\s]{2,}|^[a-z].{2,}|^\s{2,}.+/;
-
-/* ─── Utility ─── */
-
-function wordCount(text) {
-  return text.split(/\s+/).filter(Boolean).length;
-}
 
 /* ─── Main Parser Class ─── */
 

@@ -17,7 +17,9 @@ describe("ScreenplayParser", () => {
   });
 
   afterEach(() => {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {
+      // Best-effort cleanup for temporary test files.
+    }
   });
 
   /* ── Basic parsing ── */

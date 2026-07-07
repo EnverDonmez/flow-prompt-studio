@@ -4,8 +4,9 @@
 
 [![npm version](https://img.shields.io/npm/v/flow-prompt-studio)](https://www.npmjs.com/package/flow-prompt-studio)
 [![npm downloads](https://img.shields.io/npm/dm/flow-prompt-studio)](https://www.npmjs.com/package/flow-prompt-studio)
+[![CI](https://github.com/EnverDonmez/flow-prompt-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/EnverDonmez/flow-prompt-studio/actions/workflows/ci.yml)
 [![GitHub stars](https://img.shields.io/github/stars/EnverDonmez/flow-prompt-studio)](https://github.com/EnverDonmez/flow-prompt-studio)
-[![license](https://img.shields.io/npm/l/flow-prompt-studio)](https://github.com/EnverDonmez/flow-prompt-studio/blob/main/package.json)
+[![license](https://img.shields.io/npm/l/flow-prompt-studio)](https://github.com/EnverDonmez/flow-prompt-studio/blob/main/LICENSE)
 [![node](https://img.shields.io/node/v/flow-prompt-studio)](https://nodejs.org)
 
 > **No backend. No Python. No Docker. Just `npm install -g` and go.**
@@ -170,7 +171,7 @@ fps.exportShotPlan(plan, 'html', './output/');
 const gen = await fps.generate(result, plan, 'full_pack',
   { provider: 'deepseek', apiKey: process.env.DEEPSEEK_API_KEY });
 
-// 216 tests. Offline-first core.
+// 218 tests. Offline-first core.
 ```
 
 ---

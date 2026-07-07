@@ -2,7 +2,7 @@
  * Flow Prompt Studio — AI Generate Module Tests
  */
 
-const { describe, it, beforeEach, afterEach } = require("node:test");
+const { describe, it, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
 const { AIPromptGenerator, PROVIDERS, PROMPTS } = require("../src/generate");
 const { ScreenplayParser } = require("../src/parser");

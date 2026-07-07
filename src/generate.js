@@ -247,7 +247,9 @@ class AIPromptGenerator {
         const match = content.match(new RegExp(`^${envVar}\\s*=\\s*(.+)$`, "m"));
         if (match) return match[1].replace(/["']/g, "").trim();
       }
-    } catch {}
+    } catch {
+      // Ignore malformed or unreadable local env files and continue with other key sources.
+    }
 
     // 3. .fpsrc config
     try {
@@ -258,7 +260,9 @@ class AIPromptGenerator {
         const config = JSON.parse(fs.readFileSync(rcPath, "utf-8"));
         if (config.apiKeys && config.apiKeys[provider]) return config.apiKeys[provider];
       }
-    } catch {}
+    } catch {
+      // Ignore malformed or unreadable project config and report missing key below.
+    }
 
     return null;
   }

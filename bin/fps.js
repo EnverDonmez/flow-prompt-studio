@@ -17,7 +17,6 @@
 const { program } = require("commander");
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
 const readline = require("readline");
 const { FlowPromptStudioClient } = require("../src/client");
 const { ScreenplayParser } = require("../src/parser");
@@ -884,7 +883,7 @@ program
     // Parse
     const spin1 = spinner("  Parsing screenplay...");
     const parseResult = ScreenplayParser.parse(file);
-    const { scenes, characters, stats } = parseResult;
+    const { stats } = parseResult;
     spin1.stop(chalk.green(`  ✓ ${stats.totalScenes} scenes, ${stats.totalCharacters} characters, ${stats.totalDialogueLines} dialogue lines`));
 
     // Coverage
@@ -1093,7 +1092,7 @@ program.command("repair [error-type]").description("Generate repair prompt (need
       types.error_types.forEach((t, i) => console.log(`   ${String(i + 1).padStart(2)}. ${t}`));
       return;
     }
-    const result = await client.generateRepair(errorType);
+    await client.generateRepair(errorType);
     console.log(chalk.green("✓ Repair prompt generated"));
   }));
 

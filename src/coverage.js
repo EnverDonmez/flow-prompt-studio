@@ -197,7 +197,7 @@ class CoverageGenerator {
     const g = GENRES[genre.toLowerCase()];
     if (!g) throw new Error(`Unknown genre: ${genre}. Available: ${Object.keys(GENRES).join(", ")}`);
 
-    const { scenes, stats } = parseResult;
+    const { scenes } = parseResult;
     const shotRows = [];
 
     let shotNumber = 0;

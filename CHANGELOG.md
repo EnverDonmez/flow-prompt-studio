@@ -2,6 +2,17 @@
 
 All notable changes to Flow Prompt Studio.
 
+## [2.5.2] — 2026-07-07
+
+### Fixed
+- Cleaned up all ESLint errors and warnings across CLI, source modules, and tests.
+- Removed stale duplicate switch cases, unused variables, empty catch blocks, and exception parameter reassignment.
+
+### Changed
+- Added lint to the GitHub Actions CI workflow.
+- Added a root MIT `LICENSE` file and linked the README license badge to it.
+- Added a CI badge to README and updated the documented test count to 218.
+
 ## [2.5.1] — 2026-07-07
 
 ### Fixed

@@ -7,7 +7,7 @@
 
 const { describe, it, beforeEach, after, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-const { execSync, spawnSync } = require("child_process");
+const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
@@ -43,12 +43,18 @@ describe("Integration Tests", () => {
   });
 
   afterEach(() => {
-    try { process.chdir(originalCwd); } catch {}
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { process.chdir(originalCwd); } catch {
+      // Best-effort cwd restore for failed tests.
+    }
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {
+      // Best-effort cleanup for temporary test files.
+    }
   });
 
   after(() => {
-    try { process.chdir(originalCwd); } catch {}
+    try { process.chdir(originalCwd); } catch {
+      // Best-effort cwd restore for failed tests.
+    }
   });
 
   /* ────────────────────────────────────
@@ -93,7 +99,7 @@ describe("Integration Tests", () => {
   describe("init command", () => {
     it("creates .fpsrc in current directory", () => {
       process.chdir(tmpDir);
-      const { stdout, status } = fps("init");
+      const { status } = fps("init");
       assert.equal(status, 0);
       assert.ok(fs.existsSync(path.join(tmpDir, ".fpsrc")), ".fpsrc should exist");
 
@@ -118,7 +124,7 @@ describe("Integration Tests", () => {
     it("overwrites with --force", () => {
       process.chdir(tmpDir);
       fs.writeFileSync(path.join(tmpDir, ".fpsrc"), "{}", "utf-8");
-      const { stdout, status } = fps("init --force");
+      const { status } = fps("init --force");
       assert.equal(status, 0);
       const config = JSON.parse(fs.readFileSync(path.join(tmpDir, ".fpsrc"), "utf-8"));
       assert.equal(config.defaultScope, "full_pack");
@@ -223,7 +229,7 @@ describe("Integration Tests", () => {
     });
 
     it("export without type shows usage error", () => {
-      const { combined, status } = fps("export");
+      const { combined } = fps("export");
       // New export requires <type> argument
       assert.ok(combined.includes("missing") || combined.includes("error") || combined.includes("Invalid") || combined.includes("type"),
         `should show usage info, got: ${combined}`);

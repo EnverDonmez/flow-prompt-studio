@@ -19,7 +19,9 @@ describe("FileExporter", () => {
   });
 
   afterEach(() => {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {
+      // Best-effort cleanup for temporary test files.
+    }
   });
 
   /* ── Parse result exports ── */
@@ -112,9 +114,8 @@ describe("FileExporter", () => {
     it("HTML is valid and includes all shots", () => {
       const filePath = FileExporter.exportShotPlan(coverageResult, "html", tmpDir);
       const content = fs.readFileSync(filePath, "utf-8");
-      // Should have as many shot cards as shots
-      const cardCount = (content.match(/shot-card/g) || []).length;
-      // Cards show in the grid, but it's wrapped in CSS class — count differently
+      const cardCount = (content.match(/class="shot-card"/g) || []).length;
+      assert.equal(cardCount, coverageResult.totalShots);
       assert.ok(content.includes(`Total Shots</div>`));
       assert.ok(content.includes("dark") || content.includes("light")); // color scheme support
     });

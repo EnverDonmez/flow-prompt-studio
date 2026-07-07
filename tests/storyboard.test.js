@@ -18,7 +18,9 @@ describe("StoryboardGenerator", () => {
   });
 
   afterEach(() => {
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {
+      // Best-effort cleanup for temporary test files.
+    }
   });
 
   /* ── Styles ── */
@@ -72,7 +74,7 @@ describe("StoryboardGenerator", () => {
     it("creates output directory if missing", async () => {
       const nestedDir = path.join(tmpDir, "a", "b", "c");
       const sb = new StoryboardGenerator();
-      const result = await sb.generate(coverageResult, nestedDir, { limit: 1 });
+      await sb.generate(coverageResult, nestedDir, { limit: 1 });
       assert.ok(fs.existsSync(nestedDir));
     });
 

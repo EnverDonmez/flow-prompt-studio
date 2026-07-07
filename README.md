@@ -1,164 +1,204 @@
-# Flow Prompt Studio CLI
+# 🎬 Flow Prompt Studio
 
-**Screenplay parser + shot coverage generator + AI prompt engine. No backend. Zero-config.**
+**The open-source AI film production toolkit. Parse. Plan. Shoot.**
 
-Parse. Plan. Generate AI prompts. All from one CLI. No Python. No servers. Just `npm install -g` and go.
+[![npm version](https://img.shields.io/npm/v/flow-prompt-studio)](https://www.npmjs.com/package/flow-prompt-studio)
+[![npm downloads](https://img.shields.io/npm/dm/flow-prompt-studio)](https://www.npmjs.com/package/flow-prompt-studio)
+[![GitHub stars](https://img.shields.io/github/stars/EnverDonmez/flow-prompt-studio)](https://github.com/EnverDonmez/flow-prompt-studio)
+[![license](https://img.shields.io/npm/l/flow-prompt-studio)](https://github.com/EnverDonmez/flow-prompt-studio/blob/main/package.json)
+[![node](https://img.shields.io/node/v/flow-prompt-studio)](https://nodejs.org)
 
-> ✨ **v2.1**: AI prompt generation with DeepSeek, OpenAI, or Claude built right in. Backend fully optional.
-
-## Installation
-
-```bash
-npm install -g flow-prompt-studio
-```
-
-**Zero extra dependencies.** Only needs Node.js >= 18.
-
-## Quick Start
-
-```bash
-# Parse a screenplay (offline — works instantly)
-fps parse screenplay.txt
-
-# Generate a shot coverage plan
-fps shots action -s 12
-
-# Parse + cover in one step
-fps shots drama -f screenplay.txt
-
-# AI prompt generation (DeepSeek, OpenAI, Claude)
-export DEEPSEEK_API_KEY=sk-...
-fps generate -f screenplay.txt -p deepseek
-
-# Full workflow: parse → cover → AI → export — ONE command
-fps workflow screenplay.txt --ai -p deepseek --genre horror -o ./output/
-
-# Browse genre templates
-fps template --list
-
-# Inspect a specific genre
-fps template horror
-
-# Export to files
-fps export parse-result -f screenplay.txt -o ./output/
-fps export shot-plan -g action -s 10 -f csv -o ./output/
-
-# Interactive step-by-step wizard
-fps interactive
-
-# Full workflow (local parse + shot plan + optional AI)
-fps workflow screenplay.txt
-fps workflow screenplay.txt --genre horror --ai
-```
-
-## Offline Commands (no backend needed)
-
-| Command | Description |
-|---|---|
-| `fps parse <file>` | Parse screenplay — scenes, characters, dialogue |
-| `fps shots <genre>` | Generate shot coverage plan from genre template |
-| `fps template <genre>` | View genre template camera notes + equipment |
-| `fps export <type>` | Export parse/shots to files (json, csv, md, html) |
-| `fps interactive` | Step-by-step wizard — no flags, just follow prompts |
-| `fps workflow <file>` | Full workflow: parse → cover → export + optional AI |
-
-### Parse Options
-
-```
-fps parse <file> [--json] [--csv] [--markdown]
-```
-
-Extracts:
-- **Scenes** — heading, number, location, dialogue count
-- **Characters** — name, frequency, which scenes they appear in
-- **Stats** — total scenes, characters, dialogue lines, estimated pages & duration
-- Supports: `.txt`, `.md`, `.fountain`, `.fdx` (Final Draft XML)
-
-### Shot Coverage Genres
-
-| Genre | Best For |
-|---|---|
-| `action` | Chase sequences, fights, stunts — fast-paced multi-cam |
-| `drama` | Character-driven stories — performance-focused coverage |
-| `horror` | Tension & fear — dutch angles, POV, negative space |
-| `documentary` | Interviews + vérité — handheld, natural light |
-| `music_video` | Rhythmic, stylized — beat-synced, slo-mo, macro |
-| `commercial` | Product-focused — hero shot, macro detail, lifestyle |
-| `short_film` | Festival-friendly — resource-conscious, hybrid |
-
-### Export Formats
-
-```bash
-fps export parse-result --file script.txt --format json -o ./out/
-fps export shot-plan --genre action --scenes 10 --format html -o ./out/
-fps export shot-plan --file script.txt --genre action --format csv -o ./out/
-# For piping: --stdout
-fps export shot-plan -g drama -s 5 --format json --stdout | jq .
-```
-
-## Backend Commands (optional, for AI features)
-
-These require the Flow Prompt Studio backend running at `http://localhost:8000`:
-
-| Command | Description |
-|---|---|
-| `fps upload <file>` | Upload to backend for AI analysis |
-| `fps generate` | AI prompt pack generation (DeepSeek) |
-| `fps workflow --ai` | Full workflow with AI prompt generation |
-
-Start the backend, then add `--ai` to any workflow command.
-
-## Programmatic API
-
-```javascript
-// Offline — no backend, no internet
-const fps = require('flow-prompt-studio').fps;
-
-// Parse a screenplay
-const result = fps.parse('screenplay.txt');
-console.log(result.scenes);       // [{ heading, location, characters... }]
-console.log(result.characters);   // [{ name, count }]
-console.log(result.stats);        // { totalScenes, totalCharacters, ... }
-
-// Generate shot coverage
-const plan = fps.cover(result, 'action');
-console.log(plan.totalShots);     // e.g. 126
-
-// Export to file
-fps.exportShotPlan(plan, 'csv', './output/');
-fps.exportShotPlan(plan, 'html', './output/');
-```
-
-```javascript
-// With backend (optional)
-const { FlowPromptStudio } = require('flow-prompt-studio');
-const studio = new FlowPromptStudio();
-await studio.workflow('screenplay.pdf', { ultra: true });
-```
-
-## TypeScript
-
-Full type definitions included. Zero-config:
-
-```typescript
-import { fps, ScreenplayParser, CoverageGenerator, FileExporter } from 'flow-prompt-studio';
-
-const result = ScreenplayParser.parse('screenplay.txt');
-const plan = CoverageGenerator.generate(result, 'horror');
-FileExporter.exportShotPlan(plan, 'html', './output/');
-```
-
-## Project Configuration
-
-```bash
-fps init          # Creates .fpsrc in current directory
-fps doctor        # System check & troubleshooting
-```
-
-## License
-
-MIT — Free forever. No registration, no API key, no internet required for core features.
+> **No backend. No API key. No internet. No Python. No Docker. Just `npm install -g` and go.**
+> Works offline. AI features available with optional API keys.
 
 ---
 
-**Made for filmmakers, by filmmakers.** Parse. Plan. Shoot.
+## ⚡ 10-Second Demo
+
+```bash
+npx flow-prompt-studio demo
+```
+
+See screenplay parsing, shot coverage, character analysis, and budget estimation — all on a built-in short film, all in under 30 milliseconds. No setup, no files, no keys.
+
+---
+
+## 🚀 Install & Start
+
+```bash
+npm install -g flow-prompt-studio
+
+# See everything fps can do in one command:
+fps demo
+
+# Or jump straight in with your own screenplay:
+fps parse your-screenplay.txt
+```
+
+**Only needs Node.js ≥ 18. Zero extra dependencies.**
+
+---
+
+## 📖 What It Does
+
+| Command | What You Get | Needs |
+|---------|-------------|-------|
+| `fps parse <file>` | Scenes, characters, dialogue stats | Nothing |
+| `fps shots <genre>` | Shot coverage plan (7 genres) | Nothing |
+| `fps storyboard -f <file>` | Visual storyboard images (free AI) | Nothing* |
+| `fps callsheet -f <file>` | Professional call sheet → PDF | Nothing |
+| `fps budget -f <file>` | Production cost estimate ($) | Nothing |
+| `fps generate -f <file>` | AI prompt pack (13 sections) | API key |
+| `fps workflow <file> --ai` | parse → cover → AI → export | API key |
+| `fps analyze-script <file>` | Tempo, emotion, relationships | Nothing |
+| `fps convert in.fdx out.fountain` | Format conversion | Nothing |
+| `fps interactive` | Step-by-step wizard | Nothing |
+| `fps demo` | Built-in demo screenplay | Nothing |
+
+*\*Storyboard images use Pollinations.ai — completely free, no signup.*
+
+---
+
+## 🎯 Real Output (from `fps demo`)
+
+```
+🎬 Flow Prompt Studio — Live Demo                         24ms
+
+📄 Parse
+   3 scenes · 2 characters · 15 dialogue lines · ~2 min runtime
+
+Characters:
+   MAYA           ████████ 8x
+   LEO            ███████ 7x
+
+🎥 Coverage (Drama)
+   24 shots · 8.0 avg/scene · ~1 min
+   Camera: Linger on performances — don't cut too early
+   Equipment: Prime lenses (35mm, 50mm, 85mm), Dolly + track
+
+🔬 Analysis
+   Tempo: balanced
+   Dominant emotion: neutral (character-driven dialogue)
+   Strongest relationship: LEO ↔ MAYA (2 scenes)
+
+💰 Budget (indie)
+   Estimated: $14,145
+   Shoot: 1 day · Crew: 8 · Cast: 2 · Locations: 3
+```
+
+---
+
+## 🎨 Shot Coverage Genres
+
+7 built-in coverage templates with shot distributions, camera notes, and equipment recommendations:
+
+| Genre | Shots/Scene | Best For |
+|-------|------------|----------|
+| `action` | 14 | Chase sequences, fights, stunts |
+| `drama` | 8 | Character-driven stories, performances |
+| `horror` | 10 | Tension, fear, dutch angles, POV |
+| `documentary` | 6 | Interviews, vérité, handheld |
+| `music_video` | 16 | Beat-synced, slo-mo, macro |
+| `commercial` | 10 | Product-focused, lifestyle |
+| `short_film` | 7 | Festival-friendly, resource-conscious |
+
+```bash
+fps shots action -s 12          # 168 shots for 12 scenes
+fps template horror             # Full camera notes + equipment list
+fps template --list             # Browse all 7 genres
+```
+
+---
+
+## 🤖 AI Generation (optional)
+
+Three AI providers built-in. Set an env var and go:
+
+```bash
+# DeepSeek (cheapest, best value)
+export DEEPSEEK_API_KEY=sk-...
+fps generate -f script.txt -p deepseek
+
+# OpenAI
+export OPENAI_API_KEY=sk-...
+fps generate -f script.txt -p openai --model gpt-4o
+
+# Claude
+export ANTHROPIC_API_KEY=sk-ant-...
+fps generate -f script.txt -p anthropic
+```
+
+4 prompt scopes: `full_pack` (13 sections), `scene_breakdown`, `character_bible`, `ultra_image_variation`
+
+Or run everything in one command:
+```bash
+fps workflow script.txt --ai -p deepseek --genre horror -o ./output/
+```
+
+---
+
+## 📦 Export Formats
+
+| Data | Formats |
+|------|---------|
+| Parse result | JSON, CSV, Markdown, ScreenJSON |
+| Shot plan | JSON, CSV, Markdown, HTML, Resolve CSV |
+| Storyboard | HTML (responsive, dark/light mode) |
+| Call sheet | HTML (print-ready PDF) |
+| Budget | Markdown, CSV, JSON |
+| Screenplay | FDX, Fountain, TXT, ScreenJSON |
+
+```bash
+fps export parse-result -f script.txt --format screenjson -o ./out/
+fps export shot-plan -g horror -f script.txt --format resolve-csv -o ./out/
+fps export shot-plan -g drama -s 10 --format html -o ./out/
+```
+
+---
+
+## 💻 Programmatic API
+
+```javascript
+const fps = require('flow-prompt-studio').fps;
+
+// Everything is synchronous and offline:
+const result = fps.parse('screenplay.txt');
+const plan = fps.cover(result, 'horror');
+fps.exportShotPlan(plan, 'html', './output/');
+
+// With AI (async):
+const gen = await fps.generate(result, plan, 'full_pack',
+  { provider: 'deepseek', apiKey: process.env.DEEPSEEK_API_KEY });
+
+// 216 tests. Zero dependencies.
+```
+
+---
+
+## 🏗️ Advanced
+
+```bash
+fps analyze-script script.txt   # Tempo, emotion, relationships, complexity
+fps convert in.fdx out.fountain # Format conversion
+fps project init "My Film"      # Project management
+fps project add script.txt      # Add screenplays to project
+fps doctor                      # System health check
+fps config                      # AI provider status
+```
+
+---
+
+## 🌟 Why This Exists
+
+Independent filmmakers deserve professional tools that don't require subscriptions, cloud accounts, or Python backends. Flow Prompt Studio gives you:
+
+- **Script breakdown** in milliseconds — no manual highlighting
+- **Shot planning** with cinematography metadata — no Excel hell
+- **Budget estimates** from real screenplay data — no guesswork
+- **AI prompts** when you want them — no vendor lock-in
+
+Everything runs in your terminal. Everything is free. Everything is open source.
+
+---
+
+Built with ❤️ for filmmakers. [GitHub](https://github.com/EnverDonmez/flow-prompt-studio) · [npm](https://www.npmjs.com/package/flow-prompt-studio) · [Issues](https://github.com/EnverDonmez/flow-prompt-studio/issues)

@@ -614,6 +614,154 @@ program
     });
   });
 
+/* ── demo ── */
+const DEMO_SCREENPLAY = `INT. COFFEE SHOP - MORNING
+
+The smell of fresh espresso. Steam rises. A few customers scattered at tables.
+MAYA (28, sharp, restless) hunches over a laptop, muttering to herself.
+
+MAYA
+(to screen)
+Come on, come on... render, you beautiful disaster.
+
+LEO (30, effortlessly cool) slides into the chair across from her without asking.
+Two coffee cups in hand. He pushes one toward her.
+
+LEO
+You've been here since 6 AM. I counted.
+
+MAYA
+(looking up, surprised)
+You're stalking me now?
+
+LEO
+I'm a barista. It's literally my job to notice
+when someone orders seven Americanos in four hours.
+
+MAYA takes the coffee. Their fingers brush. She ignores it.
+
+MAYA
+Deadline's at noon. If this render doesn't finish...
+
+LEO
+What is it?
+
+MAYA
+A short film. My first one that doesn't look like
+it was shot on a potato.
+
+LEO leans in, genuinely curious.
+
+LEO
+Can I see?
+
+EXT. COFFEE SHOP - CONTINUOUS
+
+Through the window: Maya turns the laptop. Leo watches, nodding slowly.
+The morning light catches the steam from their cups.
+
+INT. COFFEE SHOP - LATER
+
+The laptop shows: RENDER COMPLETE.
+
+MAYA
+(exhaling)
+Oh thank god.
+
+LEO
+(smiling)
+Told you. Seventh coffee's the charm.
+
+MAYA
+(laughing for the first time)
+You're ridiculous.
+
+Their eyes meet. Something unspoken passes between them.
+
+LEO
+So what happens after the deadline?
+
+MAYA
+(beat)
+I don't know. Maybe I'll actually sleep.
+
+LEO
+Or... you could come back tomorrow.
+Not for seven coffees. Just one.
+With me.
+
+Maya looks at him — really looks at him — for the first time.
+
+MAYA
+(small smile)
+What time do you start?
+
+FADE OUT.`;
+
+program
+  .command("demo")
+  .description("Run the full pipeline on a built-in screenplay — see what fps can do in 10 seconds")
+  .action(() => {
+    const { ScreenplayParser } = require("../src/parser");
+    const { CoverageGenerator } = require("../src/coverage");
+    const { ScriptAnalyzer } = require("../src/analysis");
+    const { BudgetEstimator } = require("../src/budget");
+
+    console.log(chalk.bold("\n🎬 Flow Prompt Studio — Live Demo\n"));
+    console.log(chalk.gray("   A 2-page short film screenplay — analyzed in under a second.\n"));
+
+    // Parse
+    const start = Date.now();
+    const parseResult = ScreenplayParser.parseText(DEMO_SCREENPLAY, "coffee-shop-short.txt");
+    const parseMs = Date.now() - start;
+    console.log(chalk.yellow("📄 Parse") + chalk.gray(`  (${parseMs}ms)`));
+    console.log(`   ${chalk.bold(parseResult.stats.totalScenes)} scenes · ${chalk.bold(parseResult.stats.totalCharacters)} characters · ${chalk.bold(parseResult.stats.totalDialogueLines)} dialogue lines`);
+    console.log(`   ~${parseResult.stats.estimatedDurationMinutes} min estimated runtime\n`);
+
+    // Characters
+    console.log(chalk.yellow("Characters:"));
+    parseResult.characters.forEach((c) => {
+      const bar = "█".repeat(Math.min(c.count, 20));
+      console.log(`   ${chalk.bold(c.name.padEnd(15))} ${bar} ${c.count}x`);
+    });
+
+    // Coverage
+    const coverageResult = CoverageGenerator.generate(parseResult, "drama");
+    console.log(chalk.yellow(`\n🎥 Coverage (${coverageResult.genre.name})`));
+    console.log(`   ${chalk.bold(coverageResult.totalShots)} shots · ${coverageResult.averageShotsPerScene} avg/scene · ~${coverageResult.estimatedDurationMinutes} min`);
+    console.log(`   Camera: ${coverageResult.genre.cameraNotes[0]}`);
+    console.log(`   Equipment: ${coverageResult.genre.equipment.slice(0, 2).join(", ")}`);
+
+    // Analysis
+    const analysis = ScriptAnalyzer.analyze(parseResult);
+    console.log(chalk.yellow(`\n🔬 Analysis`));
+    console.log(`   Tempo: ${analysis.tempo.overallPace}`);
+    const domEmotion = (analysis.emotions.dominantEmotions || []).length > 0
+      ? analysis.emotions.dominantEmotions.join(", ") : "neutral (character-driven dialogue)";
+    console.log(`   Dominant emotion: ${domEmotion}`);
+    if (analysis.relationships.strongest) {
+      console.log(`   Strongest relationship: ${analysis.relationships.strongest.pair} (${analysis.relationships.strongest.sharedScenes} scenes)`);
+    }
+
+    // Budget
+    const budget = BudgetEstimator.estimate(parseResult, coverageResult, { level: "indie", genre: "drama" });
+    console.log(chalk.yellow(`\n💰 Budget (indie)`));
+    console.log(`   Estimated: ${chalk.bold("$" + budget.total.toLocaleString())}`);
+    console.log(`   Shoot: ${budget.shootDays} days · Crew: ${budget.crewSize} · Cast: ${budget.castSize} · Locations: ${budget.locationCount}`);
+
+    // What next
+    const totalMs = Date.now() - start;
+    console.log(chalk.green(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`));
+    console.log(chalk.green(`  All this in ${totalMs}ms. No backend. No API key. No internet.`));
+    console.log(chalk.green(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`));
+    console.log(chalk.cyan("  Try with your own screenplay:"));
+    console.log("    fps parse your-script.txt");
+    console.log("    fps workflow your-script.txt --genre horror");
+    console.log("    fps storyboard -f your-script.txt --style cinematic");
+    console.log("    fps callsheet -f your-script.txt -o callsheet.html\n");
+    console.log(chalk.gray(`  v${pkg.version} · github.com/EnverDonmez/flow-prompt-studio\n`));
+  });
+
 /* ── analyze ── */
 program
   .command("analyze-script <file>")

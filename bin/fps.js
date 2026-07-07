@@ -29,6 +29,8 @@ const { ScreenJSONConverter } = require("../src/screenjson");
 const { CallSheetGenerator } = require("../src/callsheet");
 const { BudgetEstimator } = require("../src/budget");
 const { ProjectManager } = require("../src/project");
+const { FormatConverter } = require("../src/convert");
+const { ScriptAnalyzer } = require("../src/analysis");
 const { chalk, spinner } = require("../src/utils");
 
 const pkg = require("../package.json");
@@ -290,7 +292,7 @@ program
 program
   .command("export <type>")
   .description("Export parse results or shot plans to files")
-  .option("-f, --format <fmt>", "Format: json, csv, markdown, html, screenjson", "markdown")
+  .option("-f, --format <fmt>", "Format: json, csv, markdown, html, screenjson, resolve-csv", "markdown")
   .option("-o, --output <dir>", "Output directory", "./output")
   .option("--file <screenplay>", "Screenplay file to parse first")
   .option("-g, --genre <genre>", "Genre for shot plan", "drama")
@@ -338,6 +340,24 @@ program
       } else {
         coverageResult = CoverageGenerator.generateFromSceneCount(parseInt(opts.scenes, 10), opts.genre);
       }
+
+      // DaVinci Resolve CSV marker format
+      if (opts.format === "resolve-csv") {
+        let csv = "Timeline,Timecode,Name,Note,Color,Duration\n";
+        coverageResult.shotRows.forEach((r, i) => {
+          const tc = this._toTimecode(i * 3); // ~3s per shot
+          csv += `V1,${tc},Shot ${r["Shot #"]} ${r["Shot Type"]},${r["Shot Name"]}: ${r["Description"].substring(0, 80)},Blue,00:00:03:00\n`;
+        });
+        if (opts.stdout) {
+          process.stdout.write(csv + "\n");
+        } else {
+          const outPath = path.join(opts.output, `resolve-markers-${coverageResult.genre.key}.csv`);
+          this._writeToFile(outPath, csv);
+          console.log(chalk.green(`✓ ${outPath}`));
+        }
+        return;
+      }
+
       if (opts.stdout) {
         FileExporter.toStdout(coverageResult);
       } else {
@@ -565,6 +585,60 @@ program
       default:
         console.error(chalk.red(`Unknown action: ${action}. Use: init, add, status, export`));
         process.exit(1);
+    }
+  }));
+
+/* ── convert ── */
+program
+  .command("convert <input> <output>")
+  .description("Convert between screenplay formats: FDX ↔ Fountain ↔ ScreenJSON ↔ TXT")
+  .action(withErrorHandler(async (input, output) => {
+    if (!fs.existsSync(input)) {
+      console.error(chalk.red(`File not found: ${input}`));
+      process.exit(1);
+    }
+    const spin1 = spinner(`Converting ${path.basename(input)}...`);
+    const result = FormatConverter.convert(input, output);
+    spin1.stop(chalk.green(`✓ ${result}`));
+    console.log(chalk.gray(`   ${path.extname(input)} → ${path.extname(output)}`));
+  }));
+
+program
+  .command("formats")
+  .description("List supported screenplay formats for conversion")
+  .action(() => {
+    console.log(chalk.cyan("Supported screenplay formats:\n"));
+    FormatConverter.listFormats().forEach((f) => {
+      console.log(`   ${chalk.bold(f.ext.padEnd(15))} ${f.name}`);
+      console.log(chalk.gray(`   ${"".padEnd(15)} ${f.desc}\n`));
+    });
+  });
+
+/* ── analyze ── */
+program
+  .command("analyze-script <file>")
+  .description("Deep script analysis: tempo, emotions, relationships, complexity")
+  .option("--json", "Output as JSON")
+  .option("--section <section>", "Specific section: tempo, emotions, relationships, complexity")
+  .action(withErrorHandler(async (file, opts) => {
+    if (!fs.existsSync(file)) {
+      console.error(chalk.red(`File not found: ${file}`));
+      process.exit(1);
+    }
+    const spin1 = spinner("Analyzing script...");
+    const parseResult = ScreenplayParser.parse(file);
+    const analysis = ScriptAnalyzer.analyze(parseResult);
+    spin1.stop(chalk.green("✓ Analysis complete"));
+
+    if (opts.json) {
+      console.log(JSON.stringify(opts.section ? analysis[opts.section] : analysis, null, 2));
+    } else {
+      if (opts.section) {
+        const s = analysis[opts.section];
+        console.log(JSON.stringify(s, null, 2));
+      } else {
+        console.log(ScriptAnalyzer.toMarkdown(analysis));
+      }
     }
   }));
 

@@ -26,6 +26,9 @@ const { FileExporter } = require("../src/export");
 const { AIPromptGenerator } = require("../src/generate");
 const { StoryboardGenerator } = require("../src/storyboard");
 const { ScreenJSONConverter } = require("../src/screenjson");
+const { CallSheetGenerator } = require("../src/callsheet");
+const { BudgetEstimator } = require("../src/budget");
+const { ProjectManager } = require("../src/project");
 const { chalk, spinner } = require("../src/utils");
 
 const pkg = require("../package.json");
@@ -412,6 +415,157 @@ program
 
     rl.close();
     console.log(chalk.green(`\n🎬 Done! ${coverageResult.sceneCount} scenes, ${coverageResult.totalShots} shots → ${outputDir}\n`));
+  }));
+
+/* ── callsheet ── */
+program
+  .command("callsheet")
+  .description("Generate professional call sheet (HTML, print-ready PDF)")
+  .option("-f, --file <screenplay>", "Screenplay file")
+  .option("-g, --genre <genre>", "Coverage genre", "drama")
+  .option("-d, --day <n>", "Shoot day number", "1")
+  .option("--title <title>", "Production title")
+  .option("--director <name>", "Director name", "TBD")
+  .option("--dp <name>", "Director of Photography", "TBD")
+  .option("--date <date>", "Shoot date (YYYY-MM-DD)")
+  .option("--location <name>", "Primary location", "TBD")
+  .option("--call <time>", "General call time", "07:00")
+  .option("-o, --output <file>", "Output HTML file", "./callsheet.html")
+  .action(withErrorHandler(async (opts) => {
+    if (!opts.file || !fs.existsSync(opts.file)) {
+      console.error(chalk.red("Screenplay file required. Use: fps callsheet -f <screenplay>"));
+      process.exit(1);
+    }
+
+    const spin1 = spinner("Building call sheet...");
+    const parseResult = ScreenplayParser.parse(opts.file);
+    const coverageResult = CoverageGenerator.generate(parseResult, opts.genre);
+
+    const cs = new CallSheetGenerator(parseResult, coverageResult);
+    const html = cs.generate({
+      day: parseInt(opts.day, 10),
+      title: opts.title || parseResult.stats.filename,
+      director: opts.director,
+      dp: opts.dp,
+      date: opts.date || new Date().toISOString().split("T")[0],
+      location: opts.location,
+      callTime: opts.call,
+    });
+
+    const outPath = opts.output || "./callsheet.html";
+    const dir = path.dirname(outPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(outPath, html, "utf-8");
+
+    spin1.stop(chalk.green(`✓ Call sheet saved: ${outPath}`));
+    console.log(chalk.gray(`   ${coverageResult.sceneCount} scenes · ${coverageResult.totalShots} shots`));
+    console.log(chalk.gray(`   Open in browser → Print → Save as PDF`));
+  }));
+
+/* ── budget ── */
+program
+  .command("budget")
+  .description("Estimate production budget from screenplay")
+  .option("-f, --file <screenplay>", "Screenplay file")
+  .option("-g, --genre <genre>", "Film genre", "drama")
+  .option("-l, --level <level>", "Budget level: indie, mid, studio", "indie")
+  .option("--json", "Output as JSON")
+  .option("--csv", "Output as CSV")
+  .option("-o, --output <file>", "Save to file")
+  .action(withErrorHandler(async (opts) => {
+    if (!opts.file || !fs.existsSync(opts.file)) {
+      console.error(chalk.red("Screenplay file required. Use: fps budget -f <screenplay>"));
+      process.exit(1);
+    }
+
+    const spin1 = spinner("Calculating budget...");
+    const parseResult = ScreenplayParser.parse(opts.file);
+    const coverageResult = CoverageGenerator.generate(parseResult, opts.genre);
+    const budget = BudgetEstimator.estimate(parseResult, coverageResult, {
+      level: opts.level,
+      genre: opts.genre,
+    });
+    spin1.stop(chalk.green(`✓ Estimated: $${budget.total.toLocaleString()}`));
+
+    if (opts.json) {
+      console.log(JSON.stringify(budget, null, 2));
+    } else if (opts.csv) {
+      const csv = BudgetEstimator.toCSV(budget);
+      if (opts.output) {
+        fs.writeFileSync(opts.output, csv, "utf-8");
+        console.log(chalk.green(`✓ Saved: ${opts.output}`));
+      } else {
+        console.log(csv);
+      }
+    } else {
+      const md = BudgetEstimator.toMarkdown(budget);
+      if (opts.output) {
+        fs.writeFileSync(opts.output, md, "utf-8");
+        console.log(chalk.green(`✓ Saved: ${opts.output}`));
+      } else {
+        console.log(md);
+      }
+    }
+
+    console.log(chalk.gray(`\n   ${budget.disclaimer}`));
+  }));
+
+/* ── project ── */
+program
+  .command("project <action>")
+  .description("Project management: init, add, status, export")
+  .option("-f, --file <path>", "Screenplay file to add")
+  .option("-g, --genre <genre>", "Genre for coverage", "drama")
+  .option("-t, --title <title>", "Project title")
+  .option("--director <name>", "Director")
+  .option("--dp <name>", "Director of Photography")
+  .option("--force", "Force overwrite")
+  .action(withErrorHandler(async (action, opts) => {
+    const pm = new ProjectManager();
+
+    switch (action) {
+      case "init": {
+        const title = opts.title || path.basename(process.cwd());
+        const project = pm.init(title, { force: opts.force, director: opts.director, dp: opts.dp });
+        console.log(chalk.green(`✓ Project initialized: "${project.title}"`));
+        console.log(chalk.gray(`   Config: ${pm.configPath}`));
+        break;
+      }
+
+      case "add": {
+        if (!opts.file) {
+          console.error(chalk.red("Use: fps project add -f <screenplay>"));
+          process.exit(1);
+        }
+        const entry = pm.addScreenplay(opts.file);
+        console.log(chalk.green(`✓ Added: ${entry.filename}`));
+        console.log(chalk.gray(`   ${entry.analysis.scenes} scenes, ${entry.analysis.characters} characters`));
+        break;
+      }
+
+      case "status": {
+        const s = pm.status();
+        console.log(chalk.cyan(`\n📋 ${s.title}\n`));
+        console.log(`   Created:    ${s.created.split("T")[0]}`);
+        console.log(`   Updated:    ${s.updated.split("T")[0]}`);
+        console.log(`   Screenplays: ${s.screenplays}`);
+        console.log(`   Coverage:    ${s.coveragePlans}`);
+        console.log(`   Exports:     ${s.exports}`);
+        if (s.metadata.genre) console.log(`   Genre:       ${s.metadata.genre}`);
+        if (s.metadata.director) console.log(`   Director:    ${s.metadata.director}`);
+        break;
+      }
+
+      case "export": {
+        const data = pm.export();
+        console.log(JSON.stringify(data, null, 2));
+        break;
+      }
+
+      default:
+        console.error(chalk.red(`Unknown action: ${action}. Use: init, add, status, export`));
+        process.exit(1);
+    }
   }));
 
 /* ═══════════════════════════════════════════

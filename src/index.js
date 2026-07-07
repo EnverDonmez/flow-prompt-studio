@@ -20,6 +20,9 @@ const { FileExporter } = require("./export");
 const { AIPromptGenerator } = require("./generate");
 const { StoryboardGenerator } = require("./storyboard");
 const { ScreenJSONConverter } = require("./screenjson");
+const { CallSheetGenerator } = require("./callsheet");
+const { BudgetEstimator } = require("./budget");
+const { ProjectManager } = require("./project");
 
 class FlowPromptStudio {
   constructor(baseUrl) {
@@ -248,5 +251,8 @@ module.exports = {
   AIPromptGenerator,
   StoryboardGenerator,
   ScreenJSONConverter,
+  CallSheetGenerator,
+  BudgetEstimator,
+  ProjectManager,
   fps,
 };

@@ -1,6 +1,6 @@
 {
   "name": "flow-prompt-studio",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "AI film production toolkit: screenplay parser, shot coverage, storyboard generator, ScreenJSON export & AI prompt engine. No backend. Zero-config. One command.",
   "main": "src/index.js",
   "types": "index.d.ts",

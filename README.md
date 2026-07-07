@@ -8,8 +8,8 @@
 [![license](https://img.shields.io/npm/l/flow-prompt-studio)](https://github.com/EnverDonmez/flow-prompt-studio/blob/main/package.json)
 [![node](https://img.shields.io/node/v/flow-prompt-studio)](https://nodejs.org)
 
-> **No backend. No API key. No internet. No Python. No Docker. Just `npm install -g` and go.**
-> Works offline. AI features available with optional API keys.
+> **No backend. No Python. No Docker. Just `npm install -g` and go.**
+> Core parsing, coverage, call sheets, budgets, conversion, and exports work offline. AI and storyboard image generation are optional online features.
 
 ---
 
@@ -35,7 +35,7 @@ fps demo
 fps parse your-screenplay.txt
 ```
 
-**Only needs Node.js ≥ 18. Zero extra dependencies.**
+**Only needs Node.js ≥ 18. Installs one small runtime dependency (`commander`).**
 
 ---
 
@@ -55,7 +55,7 @@ fps parse your-screenplay.txt
 | `fps interactive` | Step-by-step wizard | Nothing |
 | `fps demo` | Built-in demo screenplay | Nothing |
 
-*\*Storyboard images use Pollinations.ai — completely free, no signup.*
+*\*Storyboard image prompts are generated locally. Image downloads use Pollinations.ai — free, no signup, but internet is required.*
 
 ---
 
@@ -149,8 +149,8 @@ fps workflow script.txt --ai -p deepseek --genre horror -o ./output/
 | Screenplay | FDX, Fountain, TXT, ScreenJSON |
 
 ```bash
-fps export parse-result -f script.txt --format screenjson -o ./out/
-fps export shot-plan -g horror -f script.txt --format resolve-csv -o ./out/
+fps export parse-result --file script.txt --format screenjson -o ./out/
+fps export shot-plan -g horror --file script.txt --format resolve-csv -o ./out/
 fps export shot-plan -g drama -s 10 --format html -o ./out/
 ```
 
@@ -170,8 +170,19 @@ fps.exportShotPlan(plan, 'html', './output/');
 const gen = await fps.generate(result, plan, 'full_pack',
   { provider: 'deepseek', apiKey: process.env.DEEPSEEK_API_KEY });
 
-// 216 tests. Zero dependencies.
+// 216 tests. Offline-first core.
 ```
+
+---
+
+## 🔒 Privacy & Network Behavior
+
+Flow Prompt Studio keeps the core workflow local:
+
+- `parse`, `shots`, `callsheet`, `budget`, `convert`, `export`, `analyze-script`, and `demo` do not send screenplay content over the network.
+- `storyboard` sends generated image prompts to Pollinations.ai only when you request image generation.
+- `generate` and `workflow --ai` send screenplay-derived context to the AI provider you choose: DeepSeek, OpenAI, or Anthropic.
+- API keys are read from CLI flags, environment variables, `.env`, or `.fpsrc`; they are not printed in CLI output.
 
 ---
 

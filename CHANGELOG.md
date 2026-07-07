@@ -2,6 +2,45 @@
 
 All notable changes to Flow Prompt Studio.
 
+## [2.5.1] — 2026-07-07
+
+### Fixed
+- Fixed `fps export shot-plan --format resolve-csv`, which crashed because CLI-only helper methods were referenced through `this`.
+- Corrected README export examples to use `--file <screenplay>` instead of the `-f/--format` alias.
+
+### Changed
+- Clarified offline, API key, internet, and dependency claims in README.
+- Added a privacy and network behavior section explaining which commands stay local and which optional features call external services.
+- Expanded TypeScript declarations for the 2.5 API surface, including AI generation, storyboard, ScreenJSON, call sheet, budget, conversion, and analysis exports.
+
+## [2.5.0] — 2026-07-07
+
+### Added
+- `fps demo` with a built-in short screenplay and instant parse, coverage, analysis, and budget output.
+- `fps callsheet` for print-ready HTML call sheets.
+- `fps budget` for screenplay-based production cost estimates.
+- `fps project` project management helpers.
+- README badges, 10-second demo section, real demo output, expanded export format documentation, and advanced command examples.
+
+## [2.4.0] — 2026-07-07
+
+### Added
+- Storyboard image generation workflow with local prompt generation and optional Pollinations.ai image downloads.
+- Storyboard HTML output with responsive layout and placeholders when image generation is unavailable.
+
+## [2.3.0] — 2026-07-07
+
+### Added
+- Script analysis helpers for tempo, emotion, relationships, and complexity.
+- Additional CLI coverage for deeper screenplay diagnostics.
+
+## [2.2.0] — 2026-07-06
+
+### Added
+- ScreenJSON export support.
+- Screenplay format conversion helpers for FDX, Fountain, TXT, and ScreenJSON.
+- Resolve marker CSV export option for shot plans.
+
 ## [2.1.0] — 2026-07-06
 
 ### Added — Native AI Generation (No Backend Required)

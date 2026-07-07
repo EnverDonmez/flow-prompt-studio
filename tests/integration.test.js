@@ -244,6 +244,26 @@ describe("Integration Tests", () => {
       assert.ok(combined.includes("Invalid"),
         `should say invalid type, got: ${combined}`);
     });
+
+    it("exports Resolve marker CSV to stdout", () => {
+      const { stdout, status, combined } = fps("export shot-plan --format resolve-csv --stdout");
+      assert.equal(status, 0, combined);
+      assert.ok(stdout.includes("Timeline,Timecode,Name,Note,Color,Duration"));
+      assert.ok(stdout.includes("00:00:00:00"));
+      assert.ok(stdout.includes("Shot 1"));
+    });
+
+    it("exports Resolve marker CSV to a file", () => {
+      const outDir = path.join(tmpDir, "resolve-out");
+      const { stdout, status, combined } = fps(["export", "shot-plan", "--format", "resolve-csv", "-o", outDir]);
+      assert.equal(status, 0, combined);
+      assert.ok(stdout.includes("resolve-markers-drama.csv"));
+      const outFile = path.join(outDir, "resolve-markers-drama.csv");
+      assert.ok(fs.existsSync(outFile));
+      const content = fs.readFileSync(outFile, "utf-8");
+      assert.ok(content.includes("Timeline,Timecode,Name,Note,Color,Duration"));
+      assert.ok(content.includes("00:00:00:00"));
+    });
   });
 
   /* ────────────────────────────────────

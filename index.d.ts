@@ -1,4 +1,4 @@
-// TypeScript types for flow-prompt-studio v2.0
+// TypeScript types for flow-prompt-studio v2.5
 // Minimum TypeScript version: 4.5+
 
 /* ─── Screenplay Parser ─── */
@@ -102,6 +102,135 @@ export class FileExporter {
   /** @internal */ static _writeFile(filePath: string, content: string): string;
 }
 
+/* ─── AI Prompt Generation ─── */
+
+export type AIProvider = "deepseek" | "openai" | "anthropic";
+export type PromptScope = "full_pack" | "scene_breakdown" | "character_bible" | "ultra_image_variation";
+
+export interface AIGenerateOptions {
+  provider?: AIProvider;
+  apiKey?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  ultra?: boolean;
+}
+
+export interface AIProviderStatus {
+  key: AIProvider;
+  name: string;
+  model: string;
+  configured: boolean;
+  envVar: string;
+}
+
+export interface AIGenerateResult {
+  success: boolean;
+  markdown: string;
+  model: string;
+  provider: AIProvider;
+  providerName: string;
+  scope: PromptScope;
+}
+
+export class AIPromptGenerator {
+  constructor(options?: AIGenerateOptions);
+  provider: AIProvider;
+  apiKey: string;
+  model: string | null;
+  temperature: number;
+  maxTokens: number;
+  static resolveApiKey(provider: AIProvider): string | null;
+  static getProvidersStatus(): AIProviderStatus[];
+  generate(parseResult: ParseResult, coverageResult: CoverageResult, scope?: PromptScope, options?: AIGenerateOptions): Promise<AIGenerateResult>;
+}
+
+/* ─── Storyboard, ScreenJSON, Call Sheet, Budget, Project, Conversion ─── */
+
+export interface StoryboardOptions {
+  style?: string;
+  width?: number;
+  height?: number;
+  provider?: string;
+  concurrency?: number;
+  limit?: number;
+  scenes?: string;
+}
+
+export interface StoryboardImage {
+  index: number;
+  shot: ShotRow;
+  filePath?: string | null;
+  promptFile?: string;
+  prompt: string;
+  cached: boolean;
+  error?: string;
+}
+
+export interface StoryboardResult {
+  images: StoryboardImage[];
+  html: string;
+  dir: string;
+  totalGenerated: number;
+  totalRequested: number;
+}
+
+export class StoryboardGenerator {
+  constructor(options?: StoryboardOptions);
+  static listStyles(): { key: string; description: string }[];
+  generate(coverageResult: CoverageResult, outputDir: string, options?: StoryboardOptions): Promise<StoryboardResult>;
+}
+
+export class ScreenJSONConverter {
+  static convert(parseResult: ParseResult, options?: Record<string, any>): any;
+  static toJSON(parseResult: ParseResult, options?: Record<string, any>): string;
+  static toFile(parseResult: ParseResult, outputPath: string, options?: Record<string, any>): string;
+}
+
+export class CallSheetGenerator {
+  constructor(parseResult: ParseResult, coverageResult?: CoverageResult, options?: Record<string, any>);
+  generate(options?: Record<string, any>): string;
+}
+
+export interface BudgetResult {
+  level: string;
+  genre: string;
+  genreMultiplier: number;
+  shootDays: number;
+  prepDays: number;
+  wrapDays: number;
+  postWeeks: number;
+  crewSize: number;
+  castSize: number;
+  locationCount: number;
+  totalShots: number;
+  breakdown: Record<string, { amount: number; pct: string; detail: string }>;
+  subtotal: number;
+  genreAdjusted: number;
+  contingency: number;
+  total: number;
+  disclaimer: string;
+}
+
+export class BudgetEstimator {
+  static estimate(parseResult: ParseResult, coverageResult?: CoverageResult, options?: { level?: "indie" | "mid" | "studio"; genre?: string }): BudgetResult;
+  static toMarkdown(result: BudgetResult): string;
+  static toCSV(result: BudgetResult): string;
+}
+
+export class ProjectManager {
+  constructor(projectDir?: string);
+}
+
+export class FormatConverter {
+  static convert(inputPath: string, outputPath: string, toFormat?: string): string;
+  static listFormats(): { ext: string; name: string; desc: string }[];
+}
+
+export class ScriptAnalyzer {
+  static analyze(parseResult: ParseResult): any;
+}
+
 /* ─── Convenience Top-Level API (no class instance needed) ─── */
 
 export interface FpsAPI {
@@ -116,6 +245,12 @@ export interface FpsAPI {
   toMarkdown(result: CoverageResult): string;
   toCSV(result: CoverageResult): string;
   toStdout(data: any): void;
+  generate(parseResult: ParseResult, coverageResult: CoverageResult, scope?: PromptScope, options?: AIGenerateOptions): Promise<AIGenerateResult>;
+  getProvidersStatus(): AIProviderStatus[];
+  storyboard(coverageResult: CoverageResult, outputDir: string, options?: StoryboardOptions): Promise<StoryboardResult>;
+  listStoryStyles(): { key: string; description: string }[];
+  toScreenJSON(parseResult: ParseResult, options?: Record<string, any>): any;
+  exportScreenJSON(parseResult: ParseResult, outputPath: string, options?: Record<string, any>): string;
   version: string;
 }
 
@@ -193,6 +328,12 @@ export class FlowPromptStudio {
   shotPlanToCSV(result: CoverageResult): string;
   shotPlanToHTML(result: CoverageResult): string;
   workflowLocal(screenplayPath: string, genre?: string): { parse: ParseResult; coverage: CoverageResult };
+  generateAI(parseResult: ParseResult, coverageResult: CoverageResult, scope?: PromptScope, options?: AIGenerateOptions): Promise<AIGenerateResult>;
+  generateStoryboard(coverageResult: CoverageResult, outputDir: string, options?: StoryboardOptions): Promise<StoryboardResult>;
+  toScreenJSON(parseResult: ParseResult, options?: Record<string, any>): any;
+  exportScreenJSON(parseResult: ParseResult, outputPath: string, options?: Record<string, any>): string;
+  static getProvidersStatus(): AIProviderStatus[];
+  static listStoryStyles(): { key: string; description: string }[];
 
   /* Backend API (optional) */
   ping(): Promise<PingResult>;

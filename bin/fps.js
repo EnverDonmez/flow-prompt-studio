@@ -59,6 +59,22 @@ function ask(rl, question) {
   });
 }
 
+function secondsToTimecode(totalSeconds, fps = 24) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const frames = Math.floor((totalSeconds - Math.floor(totalSeconds)) * fps);
+  return [hours, minutes, seconds, frames]
+    .map((n) => String(n).padStart(2, "0"))
+    .join(":");
+}
+
+function writeTextFile(filePath, content) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content, "utf-8");
+  return filePath;
+}
+
 program
   .name("fps")
   .description("Offline-first screenplay parser & shot coverage generator — no backend required")
@@ -345,14 +361,14 @@ program
       if (opts.format === "resolve-csv") {
         let csv = "Timeline,Timecode,Name,Note,Color,Duration\n";
         coverageResult.shotRows.forEach((r, i) => {
-          const tc = this._toTimecode(i * 3); // ~3s per shot
+          const tc = secondsToTimecode(i * 3); // ~3s per shot
           csv += `V1,${tc},Shot ${r["Shot #"]} ${r["Shot Type"]},${r["Shot Name"]}: ${r["Description"].substring(0, 80)},Blue,00:00:03:00\n`;
         });
         if (opts.stdout) {
           process.stdout.write(csv + "\n");
         } else {
           const outPath = path.join(opts.output, `resolve-markers-${coverageResult.genre.key}.csv`);
-          this._writeToFile(outPath, csv);
+          writeTextFile(outPath, csv);
           console.log(chalk.green(`✓ ${outPath}`));
         }
         return;
@@ -752,7 +768,7 @@ program
     // What next
     const totalMs = Date.now() - start;
     console.log(chalk.green(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`));
-    console.log(chalk.green(`  All this in ${totalMs}ms. No backend. No API key. No internet.`));
+    console.log(chalk.green(`  All this in ${totalMs}ms. No backend. No API key. Offline core.`));
     console.log(chalk.green(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`));
     console.log(chalk.cyan("  Try with your own screenplay:"));
     console.log("    fps parse your-script.txt");

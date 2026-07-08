@@ -2,7 +2,39 @@
 
 All notable changes to Flow Prompt Studio.
 
+## [3.0.0] — 2026-07-08
+
+### Developer Note
+- The 2.6.0 field test exposed a larger product opportunity: AI video users do not only need isolated prompts, they need a production workflow that can turn a screenplay or Vizyon document into practical Google Flow / Veo shot instructions.
+- This major version is built around that field-test feedback: keep the CLI strong, support assistant/operator workflows equally, and generate complete production packs instead of generic prompt fragments.
+- Field-test gaps found in 2.6.0 include screenplay-to-shot planning, Veo duration splitting, start/end frame prompt generation, Flow tool guidance, continuity tracking, realistic negative constraints, screen/UI preservation, and structured output files that can be used by both humans and assistant workflows.
+
+### Added
+- Added `fps ingest <file>` to prepare PDF/TXT/MD/FDX sources for parsing and production-pack generation without adding a PDF runtime dependency.
+- Added `fps production-pack <file>` for Google Flow / Veo workflows.
+- Added `fps feedback <packDir>` to record approved and rejected generation results.
+- Added `ProductionPackGenerator` programmatic API.
+- Added `IngestHelper` programmatic API.
+- Added production-ready shot splitting using valid Veo durations: 4, 6, or 8 seconds.
+- Added project folder export with `INDEX.md`, `CONTINUITY.md`, `LEARNING.md`, `LEARNING.json`, `production-pack.json`, and one Markdown file per shot.
+- Added shot files with start image prompt, end image prompt, video prompt, recommended duration, required references, continuity notes, negative constraints, Google Flow setup instructions, and quality checklists.
+- Added Vizyon-style expanded shot script details: location, time of day, environment, props, wardrobe, character state, blocking, camera/framing, movement, lighting, color palette, sound, continuity, transition, VFX/post notes, AI-risk notes, and practical production constraints.
+- Added project-level continuity memory through `CONTINUITY.md`.
+- Added shot-level model risk profiling for issues such as `face_identity`, `text_on_screen`, `screen_continuity`, `ui_redesign`, `overacting`, `logos`, and `alarm_exaggeration`.
+- Added automatic negative constraints from risk profiles.
+- Added a reference strategy block for each shot, covering character references, location references, previous frame references, screen continuity references, and rejected visual directions.
+- Added a Flow Tool Advisor that recommends when to use reference images, start/end frames, or editing/repair tools inside Google Flow.
+- Added approved/rejected output learning so real field feedback can be reused as positive guidance or negative constraints in later prompt generations.
+- Added separate workflow modes:
+  - `standard`: fast prompt generation
+  - `director`: shot breakdown, references, Flow settings, risk notes, continuity, start/end/video prompts, and quality checks
+
 ## [2.6.0] — 2026-07-07
+
+### Field Test Follow-up
+- Started a public `FIELD_TEST_NOTES.md` log from hands-on use of Flow Prompt Studio on a real short documentary / AI-video workflow.
+- Documented production issues found during hands-on package use, including PDF-derived screenplay formats, timecoded documentary sections, Vizyon `SAHNE SCN-###` headings, Turkish uppercase character detection, and Veo/Flow continuity prompt problems.
+- These notes will guide the next patch release so fixes are driven by real production friction, not only demo scripts.
 
 ### Added
 - Expanded native AI generation from 3 providers to 11 major providers plus custom OpenAI-compatible endpoints.

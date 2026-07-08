@@ -25,6 +25,8 @@ const { BudgetEstimator } = require("./budget");
 const { ProjectManager } = require("./project");
 const { FormatConverter } = require("./convert");
 const { ScriptAnalyzer } = require("./analysis");
+const { ProductionPackGenerator } = require("./productionPack");
+const { IngestHelper } = require("./ingest");
 
 class FlowPromptStudio {
   constructor(baseUrl) {
@@ -66,6 +68,26 @@ class FlowPromptStudio {
 
   exportShotPlan(coverageResult, format, outputDir) {
     return FileExporter.exportShotPlan(coverageResult, format, outputDir);
+  }
+
+  createProductionPack(parseResult, options = {}) {
+    return ProductionPackGenerator.create(parseResult, options);
+  }
+
+  exportProductionPack(parseResult, outputDir, options = {}) {
+    return ProductionPackGenerator.export(parseResult, outputDir, options);
+  }
+
+  recordProductionFeedback(projectDir, feedback) {
+    return ProductionPackGenerator.recordFeedback(projectDir, feedback);
+  }
+
+  loadProductionLearning(inputPath) {
+    return ProductionPackGenerator.loadLearning(inputPath);
+  }
+
+  ingest(filePath, outputDir, options = {}) {
+    return IngestHelper.ingest(filePath, outputDir, options);
   }
 
   /* ── Offline: Render to string ── */
@@ -224,6 +246,11 @@ const fps = {
   getGenre: (genre) => CoverageGenerator.getGenre(genre),
   exportParseResult: (r, f, d) => FileExporter.exportParseResult(r, f, d),
   exportShotPlan: (r, f, d) => FileExporter.exportShotPlan(r, f, d),
+  createProductionPack: (r, opts) => ProductionPackGenerator.create(r, opts),
+  exportProductionPack: (r, d, opts) => ProductionPackGenerator.export(r, d, opts),
+  recordProductionFeedback: (d, f) => ProductionPackGenerator.recordFeedback(d, f),
+  loadProductionLearning: (p) => ProductionPackGenerator.loadLearning(p),
+  ingest: (f, d, opts) => IngestHelper.ingest(f, d, opts),
   toMarkdown: (r) => CoverageGenerator.toMarkdown(r),
   toCSV: (r) => CoverageGenerator.toCSV(r),
   toStdout: (d) => FileExporter.toStdout(d),
@@ -245,6 +272,7 @@ const fps = {
 };
 
 module.exports = {
+  version: require("../package.json").version,
   FlowPromptStudio,
   FlowPromptStudioClient,
   ScreenplayParser,
@@ -258,5 +286,7 @@ module.exports = {
   ProjectManager,
   FormatConverter,
   ScriptAnalyzer,
+  ProductionPackGenerator,
+  IngestHelper,
   fps,
 };

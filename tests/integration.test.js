@@ -72,7 +72,7 @@ describe("Integration Tests", () => {
       assert.equal(status, 0);
       const expected = ["config", "upload", "analyze", "style", "generate",
         "estimate", "coverage", "repair", "validate", "export",
-        "preview", "workflow", "init", "doctor", "help"];
+        "preview", "workflow", "ingest", "production-pack", "feedback", "init", "doctor", "help"];
       expected.forEach(cmd => {
         assert.ok(stdout.includes(cmd), `--help should mention '${cmd}'`);
       });
@@ -196,7 +196,45 @@ describe("Integration Tests", () => {
   });
 
   /* ────────────────────────────────────
-   * 4. Graceful errors (no backend)
+   * 4. Production pack CLI
+   * ──────────────────────────────────── */
+  describe("production pack CLI", () => {
+    it("ingests text sources and can generate a production pack", () => {
+      const file = path.join(tmpDir, "vision.txt");
+      const ingestOut = path.join(tmpDir, "ingest-out");
+      const packOut = path.join(tmpDir, "pack-out");
+      fs.writeFileSync(file, "SCENE 1\nDENIZ\nHello.\n", "utf-8");
+
+      const { status, combined } = fps(["ingest", file, "-o", ingestOut, "--pack", "--pack-output", packOut, "--title", "Vision CLI"]);
+
+      assert.equal(status, 0, combined);
+      assert.ok(combined.includes("Source ingested"));
+      assert.ok(fs.existsSync(path.join(ingestOut, "vision-cli", "vision-cli.flow.txt")));
+      assert.ok(fs.existsSync(path.join(packOut, "vision-cli", "INDEX.md")));
+      assert.ok(fs.existsSync(path.join(packOut, "vision-cli", "LEARNING.json")));
+    });
+
+    it("records feedback for production packs", () => {
+      const file = path.join(tmpDir, "script.txt");
+      const packOut = path.join(tmpDir, "pack-out");
+      fs.writeFileSync(file, "SCENE 1: CYBER OFFICE - NIGHT\nA monitor shows code.", "utf-8");
+
+      const packResult = fps(["production-pack", file, "-o", packOut, "--title", "Feedback CLI", "--shots-per-scene", "1"]);
+      assert.equal(packResult.status, 0, packResult.combined);
+
+      const packDir = path.join(packOut, "feedback-cli");
+      const feedbackResult = fps(["feedback", packDir, "--type", "rejected", "--shot", "SHOT_001", "--note", "screen became too red", "--tags", "screen_continuity"]);
+      assert.equal(feedbackResult.status, 0, feedbackResult.combined);
+      assert.ok(feedbackResult.combined.includes("Feedback recorded"));
+
+      const learning = JSON.parse(fs.readFileSync(path.join(packDir, "LEARNING.json"), "utf-8"));
+      assert.equal(learning.rejected.length, 1);
+      assert.equal(learning.rejected[0].note, "screen became too red");
+    });
+  });
+
+  /* ────────────────────────────────────
+   * 5. Graceful errors (no backend)
    * ──────────────────────────────────── */
   describe("graceful errors without backend", () => {
     it("config shows provider status even without backend", () => {
@@ -273,7 +311,7 @@ describe("Integration Tests", () => {
   });
 
   /* ────────────────────────────────────
-   * 5. Programmatic API (no backend)
+   * 6. Programmatic API (no backend)
    * ──────────────────────────────────── */
   describe("programmatic API", () => {
     let FlowPromptStudio, FlowPromptStudioClient;
@@ -407,7 +445,7 @@ describe("Integration Tests", () => {
   });
 
   /* ────────────────────────────────────
-   * 6. Utils (spinner, chalk)
+   * 7. Utils (spinner, chalk)
    * ──────────────────────────────────── */
   describe("utils", () => {
     it("spinner.update and spinner.stop work", (context, done) => {
@@ -470,7 +508,7 @@ describe("Integration Tests", () => {
   });
 
   /* ────────────────────────────────────
-   * 7. Smoke: workflow --help
+   * 8. Smoke: workflow --help
    * ──────────────────────────────────── */
   describe("CLI edge cases", () => {
     it("unknown command shows helpful output", () => {
@@ -534,7 +572,7 @@ describe("Integration Tests", () => {
   });
 
   /* ────────────────────────────────────
-   * 8. TypeScript definitions file
+   * 9. TypeScript definitions file
    * ──────────────────────────────────── */
   describe("index.d.ts", () => {
     it("exists and contains all exported classes", () => {
@@ -546,6 +584,9 @@ describe("Integration Tests", () => {
       assert.ok(dts.includes("PingResult"));
       assert.ok(dts.includes("EstimateResult"));
       assert.ok(dts.includes("UploadResult"));
+      assert.ok(dts.includes("ProductionPackGenerator"));
+      assert.ok(dts.includes("IngestHelper"));
+      assert.ok(dts.includes("recordProductionFeedback"));
       assert.ok(dts.includes("ping(): Promise<PingResult>"));
       assert.ok(dts.includes("estimate(filePath: string): Promise<EstimateResult>"));
       assert.ok(dts.includes("clearCache(): void"));
@@ -553,7 +594,7 @@ describe("Integration Tests", () => {
   });
 
   /* ────────────────────────────────────
-   * 9. package.json integrity
+   * 10. package.json integrity
    * ──────────────────────────────────── */
   describe("package.json", () => {
     it("has all required fields", () => {

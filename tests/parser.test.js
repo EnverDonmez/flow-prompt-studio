@@ -118,6 +118,96 @@ describe("ScreenplayParser", () => {
       const result = ScreenplayParser.parse(file);
       assert.ok(result.scenes.length >= 5, `got ${result.scenes.length}`);
     });
+
+    it("detects timecoded documentary scene headings", () => {
+      const file = path.join(tmpDir, "timecoded.txt");
+      fs.writeFileSync(file, [
+        "00:00 - 00:29 | AÇILIŞ",
+        "GÖRÜNTÜ",
+        "Deniz telefona bakar.",
+        "ANLATICI",
+        "Bu sadece soru sorduğumuz bir uygulama değil.",
+        "",
+        "00:29 - 01:05 | AÇILIŞIN DÖNÜŞÜ",
+        "GÖRÜNTÜ",
+        "Ekrandaki cevap değişir.",
+      ].join("\n"), "utf-8");
+      const result = ScreenplayParser.parse(file);
+      assert.equal(result.scenes.length, 2);
+      assert.equal(result.scenes[0].number, "00:00-00:29");
+      assert.equal(result.scenes[0].location, "AÇILIŞ");
+      assert.ok(result.scenes[0].content.includes("Deniz telefona bakar."));
+      assert.ok(!result.characters.some((c) => c.name === "GÖRÜNTÜ"));
+      assert.ok(result.characters.some((c) => c.name === "ANLATICI"));
+    });
+
+    it("does not duplicate an implicit scene", () => {
+      const file = path.join(tmpDir, "plain.txt");
+      fs.writeFileSync(file, "Title page\nA plain document without scene markers.", "utf-8");
+      const result = ScreenplayParser.parse(file);
+      assert.equal(result.scenes.length, 1);
+    });
+
+    it("ignores preamble before explicit scene headings", () => {
+      const file = path.join(tmpDir, "preamble.txt");
+      fs.writeFileSync(file, [
+        "PROJECT TITLE",
+        "Pitch notes before the script.",
+        "",
+        "00:00 - 00:29 | AÇILIŞ",
+        "ANLATICI",
+        "Başlıyoruz.",
+      ].join("\n"), "utf-8");
+      const result = ScreenplayParser.parse(file);
+      assert.equal(result.scenes.length, 1);
+      assert.equal(result.scenes[0].number, "00:00-00:29");
+      assert.ok(!result.characters.some((c) => c.name === "PROJECT TITLE"));
+    });
+
+    it("does not treat documentary visual section labels as characters", () => {
+      const file = path.join(tmpDir, "doc-labels.txt");
+      fs.writeFileSync(file, [
+        "00:00 - 00:29 | AÇILIŞ",
+        "TARIM VE SU",
+        "GÖRÜNTÜ",
+        "Geniş bir tarla görünür.",
+        "DENİZ",
+        "Bunu şimdi anlıyorum.",
+      ].join("\n"), "utf-8");
+      const result = ScreenplayParser.parse(file);
+      const names = result.characters.map((c) => c.name);
+      assert.ok(!names.includes("TARIM VE SU"));
+      assert.ok(names.includes("DENİZ"));
+    });
+
+    it("detects Vision SCN scene headings", () => {
+      const file = path.join(tmpDir, "vision.txt");
+      fs.writeFileSync(file, [
+        "GÖRÜNMEYEN ORTAK",
+        "PROJE ÖZETI",
+        "",
+        "SAHNE SCN-001: DENİZ'İN ODASI — GECE",
+        "Karakterler:** Deniz",
+        "DENİZ",
+        "Tamamdır.",
+        "TEKNİK BLOK",
+        "PLAN: SİYAH → GENEL → YAKIN",
+        "",
+        "SAHNE SCN-002: HASTANE — SABAH",
+        "ANLATICI",
+        "Bir doktorun önüne her gün yüzlerce görüntü gelebilir.",
+      ].join("\n"), "utf-8");
+      const result = ScreenplayParser.parse(file);
+      assert.equal(result.scenes.length, 2);
+      assert.equal(result.scenes[0].number, "SCN-001");
+      assert.equal(result.scenes[0].location, "DENİZ'İN ODASI — GECE");
+      assert.ok(result.scenes[0].content.includes("PLAN: SİYAH"));
+      const names = result.characters.map((c) => c.name);
+      assert.ok(names.includes("DENİZ"));
+      assert.ok(names.includes("ANLATICI"));
+      assert.ok(!names.includes("TEKNİK BLOK"));
+      assert.ok(!names.includes("PROJE ÖZETI"));
+    });
   });
 
   /* ── parseText ── */

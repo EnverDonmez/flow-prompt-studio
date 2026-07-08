@@ -1,7 +1,7 @@
 {
   "name": "flow-prompt-studio",
-  "version": "2.6.0",
-  "description": "AI film production toolkit: screenplay parser, shot coverage, storyboard generator, ScreenJSON export & AI prompt engine. No backend. Zero-config. One command.",
+  "version": "3.0.0",
+  "description": "Offline-first AI film production toolkit: screenplay parser, Google Flow/Veo production packs, continuity memory, shot planning, storyboard, ScreenJSON & AI prompts.",
   "main": "src/index.js",
   "types": "index.d.ts",
   "bin": {
@@ -14,6 +14,7 @@
     "skills/",
     "README.md",
     "CHANGELOG.md",
+    "FIELD_TEST_NOTES.md",
     "index.d.ts"
   ],
   "scripts": {
@@ -43,7 +44,11 @@
     "shot-planning",
     "camera-coverage",
     "flow-agent",
-    "image-first"
+    "image-first",
+    "production-pack",
+    "continuity",
+    "google-veo",
+    "ai-video-production"
   ],
   "author": "Flow Prompt Studio",
   "license": "MIT",

@@ -30,6 +30,8 @@ const { BudgetEstimator } = require("../src/budget");
 const { ProjectManager } = require("../src/project");
 const { FormatConverter } = require("../src/convert");
 const { ScriptAnalyzer } = require("../src/analysis");
+const { ProductionPackGenerator } = require("../src/productionPack");
+const { IngestHelper } = require("../src/ingest");
 const { chalk, spinner } = require("../src/utils");
 
 const pkg = require("../package.json");
@@ -310,6 +312,117 @@ program
       console.log(chalk.yellow(`\n   ⚠ ${result.totalRequested - result.totalGenerated} images could not be generated.`));
       console.log(chalk.gray(`   Prompts saved as .txt files for manual generation.`));
     }
+  }));
+
+/* ── production-pack ── */
+program
+  .command("ingest <file>")
+  .description("Prepare PDF/TXT/MD/FDX screenplay sources for parsing and production-pack generation")
+  .option("-o, --output <dir>", "Output directory", "./fps-ingest")
+  .option("-t, --title <title>", "Project title")
+  .option("--pack", "Generate a production pack after ingest when text is available")
+  .option("--pack-output <dir>", "Production pack output directory", "./flow-production-pack")
+  .option("--json", "Print ingest result JSON to stdout")
+  .action(withErrorHandler(async (file, opts) => {
+    const spin = spinner("Preparing source...");
+    const result = IngestHelper.ingest(file, opts.output, { title: opts.title });
+    spin.stop(chalk.green(result.manual ? "✓ PDF ingest instructions written" : "✓ Source ingested"));
+
+    let pack = null;
+    if (opts.pack && !result.manual) {
+      const packSpin = spinner("Generating production pack from prepared text...");
+      pack = ProductionPackGenerator.export(result.parseResult, opts.packOutput, {
+        title: opts.title || result.title,
+        projectDir: path.dirname(result.normalizedPath),
+      });
+      packSpin.stop(chalk.green(`✓ Production pack generated: ${pack.shotCount} shots`));
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify({ ...result, pack }, null, 2));
+      return;
+    }
+
+    console.log(chalk.gray(`   Output: ${result.outputDir}`));
+    console.log(chalk.gray(`   Prepared text: ${result.normalizedPath}`));
+    if (result.manual) {
+      console.log(chalk.yellow(`   ${result.message}`));
+    } else {
+      console.log(chalk.gray(`   Scenes: ${result.parseResult.stats.totalScenes}`));
+    }
+    if (pack) console.log(chalk.gray(`   Pack: ${pack.outputDir}`));
+  }));
+
+program
+  .command("production-pack <file>")
+  .description("Generate a Google Flow / Veo production pack with shot files, prompts, references, and continuity")
+  .option("-o, --output <dir>", "Output directory", "./flow-production-pack")
+  .option("-t, --title <title>", "Project title")
+  .option("-m, --mode <mode>", "Workflow mode: standard or director", "director")
+  .option("--shots-per-scene <count>", "Force a fixed number of shots per scene")
+  .option("--default-duration <seconds>", "Default Veo duration for non-timecoded scenes: 4, 6, or 8", "8")
+  .option("--learning <path>", "Existing LEARNING.json file or production-pack directory to reuse")
+  .option("--json", "Print generated pack JSON to stdout")
+  .action(withErrorHandler(async (file, opts) => {
+    if (!fs.existsSync(file)) {
+      console.error(chalk.red(`File not found: ${file}`));
+      process.exit(1);
+    }
+
+    const mode = ["standard", "director"].includes(opts.mode) ? opts.mode : "director";
+    const spin = spinner("Generating Google Flow / Veo production pack...");
+    const parseResult = ScreenplayParser.parse(file);
+    const pack = ProductionPackGenerator.export(parseResult, opts.output, {
+      title: opts.title,
+      mode,
+      shotsPerScene: opts.shotsPerScene,
+      defaultDuration: opts.defaultDuration,
+      learningPath: opts.learning,
+    });
+    spin.stop(chalk.green(`✓ Production pack generated: ${pack.shotCount} shots`));
+
+    if (opts.json) {
+      console.log(JSON.stringify(pack, null, 2));
+      return;
+    }
+
+    console.log(chalk.gray(`   Output: ${pack.outputDir}`));
+    console.log(chalk.gray(`   Index:  ${path.join(pack.outputDir, "INDEX.md")}`));
+    console.log(chalk.gray(`   Continuity: ${path.join(pack.outputDir, "CONTINUITY.md")}`));
+    console.log(chalk.gray(`   Shots:  ${path.join(pack.outputDir, "shots")}`));
+  }));
+
+/* ── feedback ── */
+program
+  .command("feedback <packDir>")
+  .description("Record approved or rejected generation feedback for a production pack")
+  .requiredOption("--type <type>", "Feedback type: approved or rejected")
+  .requiredOption("--note <note>", "What worked or failed")
+  .option("--shot <id>", "Shot identifier, for example SHOT_006 or 6")
+  .option("--tags <tags>", "Comma-separated tags, for example screen_continuity,overacting")
+  .option("--json", "Print updated learning JSON to stdout")
+  .action(withErrorHandler(async (packDir, opts) => {
+    const type = String(opts.type || "").toLowerCase();
+    if (!["approved", "rejected"].includes(type)) {
+      console.error(chalk.red("Invalid feedback type. Use: approved or rejected"));
+      process.exit(1);
+    }
+
+    const result = ProductionPackGenerator.recordFeedback(packDir, {
+      type,
+      note: opts.note,
+      shot: opts.shot || null,
+      tags: opts.tags || "",
+    });
+
+    if (opts.json) {
+      console.log(JSON.stringify(result.learning, null, 2));
+      return;
+    }
+
+    console.log(chalk.green(`✓ Feedback recorded: ${result.entry.type}`));
+    console.log(chalk.gray(`   Scope: ${result.entry.scope}`));
+    console.log(chalk.gray(`   Learning: ${result.learningPath}`));
   }));
 
 /* ── export (updated with screenjson) ── */

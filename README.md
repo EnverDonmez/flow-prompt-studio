@@ -12,6 +12,8 @@
 > **No backend. No Python. No Docker. Just `npm install -g` and go.**
 > Core parsing, coverage, call sheets, budgets, conversion, and exports work offline. AI and storyboard image generation are optional online features.
 
+> **Field-tested by the author.** See [`FIELD_TEST_NOTES.md`](FIELD_TEST_NOTES.md) for real production issues found while using Flow Prompt Studio on an AI-video short documentary workflow.
+
 ---
 
 ## ⚡ 10-Second Demo
@@ -44,7 +46,10 @@ fps parse your-screenplay.txt
 
 | Command | What You Get | Needs |
 |---------|-------------|-------|
+| `fps ingest <file>` | Prepare PDF/TXT/MD/FDX sources for parsing and production packs | Nothing* |
 | `fps parse <file>` | Scenes, characters, dialogue stats | Nothing |
+| `fps production-pack <file>` | Google Flow / Veo shot files, prompts, references, continuity | Nothing |
+| `fps feedback <packDir>` | Record approved/rejected generation learning | Nothing |
 | `fps shots <genre>` | Shot coverage plan (7 genres) | Nothing |
 | `fps storyboard -f <file>` | Visual storyboard images (free AI) | Nothing* |
 | `fps callsheet -f <file>` | Professional call sheet → PDF | Nothing |
@@ -56,7 +61,7 @@ fps parse your-screenplay.txt
 | `fps interactive` | Step-by-step wizard | Nothing |
 | `fps demo` | Built-in demo screenplay | Nothing |
 
-*\*Storyboard image prompts are generated locally. Image downloads use Pollinations.ai — free, no signup, but internet is required.*
+*\*PDF ingest uses the local `pdftotext` binary when available, or writes manual extraction instructions. Storyboard image prompts are generated locally; image downloads use Pollinations.ai — free, no signup, but internet is required.*
 
 ---
 
@@ -107,6 +112,45 @@ Characters:
 fps shots action -s 12          # 168 shots for 12 scenes
 fps template horror             # Full camera notes + equipment list
 fps template --list             # Browse all 7 genres
+```
+
+---
+
+## 🎬 Google Flow / Veo Production Packs
+
+Generate a complete project folder for AI-video production:
+
+```bash
+fps production-pack script.txt -o ./flow-pack --title "My Short Film"
+```
+
+The pack includes:
+
+- `INDEX.md` — project overview and shot list
+- `CONTINUITY.md` — character, location, visual, and rejected-output memory
+- `LEARNING.json` / `LEARNING.md` — approved/rejected output learning that can influence later prompts
+- `shots/SHOT_001.md` — one file per shot with Flow setup, references, start image prompt, end image prompt, video prompt, risks, and quality checklist
+- `production-pack.json` — machine-readable manifest for assistant/operator workflows
+
+Production packs split scenes into valid Veo durations: 4, 6, or 8 seconds. The generated prompts intentionally avoid duration wording because Google Flow already exposes duration as a UI setting.
+
+```bash
+fps production-pack vision.txt --mode director --shots-per-scene 3 --default-duration 6
+```
+
+Prepare sources first:
+
+```bash
+fps ingest screenplay.pdf -o ./prepared
+fps ingest vision.txt --pack --pack-output ./flow-pack --title "My Film"
+```
+
+Record what worked or failed, then reuse it:
+
+```bash
+fps feedback ./flow-pack/my-film --type rejected --shot SHOT_006 --note "screen became too red and added alarm popups" --tags screen_continuity,alarm_exaggeration
+fps feedback ./flow-pack/my-film --type approved --shot SHOT_006 --note "realistic office lighting and stable dashboard layout"
+fps production-pack vision.txt -o ./flow-pack --title "My Film" --learning ./flow-pack/my-film
 ```
 
 ---
@@ -196,11 +240,24 @@ const result = fps.parse('screenplay.txt');
 const plan = fps.cover(result, 'horror');
 fps.exportShotPlan(plan, 'html', './output/');
 
+// Google Flow / Veo production pack:
+const pack = fps.exportProductionPack(result, './flow-pack', {
+  title: 'My Short Film',
+  mode: 'director'
+});
+
+// Record field feedback and reuse it later:
+fps.recordProductionFeedback(pack.outputDir, {
+  type: 'rejected',
+  shot: 'SHOT_001',
+  note: 'too much red alarm styling'
+});
+
 // With AI (async):
 const gen = await fps.generate(result, plan, 'full_pack',
   { provider: 'deepseek', apiKey: process.env.DEEPSEEK_API_KEY });
 
-// 224 tests. Offline-first core.
+// 239 tests. Offline-first core.
 ```
 
 ---
@@ -209,7 +266,7 @@ const gen = await fps.generate(result, plan, 'full_pack',
 
 Flow Prompt Studio keeps the core workflow local:
 
-- `parse`, `shots`, `callsheet`, `budget`, `convert`, `export`, `analyze-script`, and `demo` do not send screenplay content over the network.
+- `ingest`, `parse`, `production-pack`, `feedback`, `shots`, `callsheet`, `budget`, `convert`, `export`, `analyze-script`, and `demo` do not send screenplay content over the network.
 - `storyboard` sends generated image prompts to Pollinations.ai only when you request image generation.
 - `generate` and `workflow --ai` send screenplay-derived context to the AI provider you choose: DeepSeek, OpenAI, Anthropic, Gemini, Mistral, Groq, xAI, Cohere, Perplexity, Together AI, OpenRouter, or your custom OpenAI-compatible endpoint.
 - API keys are read from CLI flags, environment variables, `.env`, or `.fpsrc`; they are not printed in CLI output.
@@ -220,6 +277,9 @@ Flow Prompt Studio keeps the core workflow local:
 
 ```bash
 fps analyze-script script.txt   # Tempo, emotion, relationships, complexity
+fps ingest script.pdf           # Prepare PDF/TXT/MD/FDX sources
+fps production-pack script.txt  # Google Flow / Veo production pack
+fps feedback ./pack --type rejected --note "too cinematic"
 fps convert in.fdx out.fountain # Format conversion
 fps project init "My Film"      # Project management
 fps project add script.txt      # Add screenplays to project

@@ -12,9 +12,15 @@ const path = require("path");
 
 /* ─── Scene Detection Patterns ─── */
 
+const TIMECODE_SCENE_PATTERN = /^(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—]\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*\|\s*(.+)$/i;
+
 const SCENE_PATTERNS = [
   // Standard screenplay format: INT./EXT. or INT/EXT
   /^(INT\.|EXT\.|INT\/EXT|EXT\/INT|I\/E|E\/I)[.\s-]+(.+)$/im,
+  // Timecoded documentary/script sections: 00:00 - 00:29 | OPENING
+  TIMECODE_SCENE_PATTERN,
+  // Vision/AI-video format: SAHNE SCN-001: LOCATION - TIME
+  /^(SAHNE|SCENE)\s+(SCN-\d+)\s*:\s*(.+)$/im,
   // Numbered scenes: SCENE 1, SCENE: 1, SCÈNE 1
   /^(SCENE|SCÈNE|SCENA|SZENE|BÖLÜM|CHAPTER|REEL|ACT)\s*[:.\-—]?\s*(\d+)\s*[:.\-—]?\s*(.*)$/im,
   // Fountain format: # Section, ## Scene
@@ -26,9 +32,27 @@ const SCENE_PATTERNS = [
 /* ─── Character Detection ─── */
 
 // Standard format: ALL CAPS name on its own line (typically before dialogue)
-const CHARACTER_LINE = /^[A-ZÀ-Ü][A-ZÀ-Ü\s'\-().]{1,30}[A-ZÀ-Ü]$/;
+const TURKISH_UPPER = "A-ZÀ-ÖØ-ÞĞİŞÇÜÖ";
+const CHARACTER_LINE = new RegExp(`^[${TURKISH_UPPER}][${TURKISH_UPPER}\\s'\\-().]{1,30}[${TURKISH_UPPER}]$`);
 // More permissive: ALL CAPS name followed by dialogue in parentheses or next line
-const CHARACTER_PAREN = /^([A-ZÀ-Ü][A-ZÀ-Ü\s'\-().]{1,30}[A-ZÀ-Ü])\s*\(([^)]+)\)\s*$/;
+const CHARACTER_PAREN = new RegExp(`^([${TURKISH_UPPER}][${TURKISH_UPPER}\\s'\\-().]{1,30}[${TURKISH_UPPER}])\\s*\\(([^)]+)\\)\\s*$`);
+
+const NON_CHARACTER_CUES = new Set([
+  "GÖRÜNTÜ",
+  "GORUNTU",
+  "VISUAL",
+  "IMAGE",
+  "SHOT",
+  "ALT YAZI",
+  "ALTYAZI",
+  "SUBTITLE",
+  "TEKNİK BLOK",
+  "TEKNIK BLOK",
+  "AI-ZORLUK",
+  "MODEL NOTU",
+  "KALİTE RAPORU",
+  "KALITE RAPORU",
+]);
 
 /* ─── Main Parser Class ─── */
 
@@ -93,6 +117,10 @@ class ScreenplayParser {
     const scenes = [];
     const characters = {};
     const rawScenes = [];
+    const hasExplicitScenes = lines.some((raw) => {
+      const line = raw.trim();
+      return line && SCENE_PATTERNS.some((pattern) => line.match(pattern));
+    });
 
     let currentScene = null;
     let currentCharacter = null;
@@ -120,8 +148,9 @@ class ScreenplayParser {
           }
 
           const heading = line;
-          const sceneNumber = m[2] || `S${sceneIndex}`;
-          const location = m[2] ? (m[3] || m[2]) : (m[1] || line);
+          const isTimecoded = pattern === TIMECODE_SCENE_PATTERN;
+          const sceneNumber = isTimecoded ? `${m[1]}-${m[2]}` : (m[2] || `S${sceneIndex}`);
+          const location = isTimecoded ? m[3] : (m[2] ? (m[3] || m[2]) : (m[1] || line));
 
           currentScene = {
             index: sceneIndex,
@@ -131,6 +160,7 @@ class ScreenplayParser {
             lineNumber: i + 1,
             dialogueCount: 0,
             characters: new Set(),
+            contentLines: [],
           };
           currentCharacter = null;
           sceneDetected = true;
@@ -140,7 +170,7 @@ class ScreenplayParser {
       if (sceneDetected) continue;
 
       // No scene yet? Create implicit scene from first content
-      if (!currentScene && line) {
+      if (!currentScene && line && !hasExplicitScenes) {
         sceneIndex++;
         currentScene = {
           index: sceneIndex,
@@ -150,11 +180,21 @@ class ScreenplayParser {
           lineNumber: i + 1,
           dialogueCount: 0,
           characters: new Set(),
+          contentLines: [],
         };
-        rawScenes.push(currentScene);
       }
 
       if (!currentScene) continue;
+
+      currentScene.contentLines.push(line);
+
+      const nextContentLine = (() => {
+        for (let j = i + 1; j < lines.length; j++) {
+          const nextLine = lines[j].trim();
+          if (nextLine) return nextLine;
+        }
+        return "";
+      })();
 
       // ── Character Detection ──
       const charParen = line.match(CHARACTER_PAREN);
@@ -171,6 +211,8 @@ class ScreenplayParser {
         CHARACTER_LINE.test(line) &&
         line.length < 40 &&
         line === line.toUpperCase() &&
+        !NON_CHARACTER_CUES.has(line) &&
+        !NON_CHARACTER_CUES.has(nextContentLine) &&
         !line.startsWith("INT") &&
         !line.startsWith("EXT") &&
         !line.startsWith("SCENE") &&
@@ -224,6 +266,7 @@ class ScreenplayParser {
         lineNumber: scene.lineNumber,
         dialogueCount: scene.dialogueCount,
         characters: [...scene.characters],
+        content: scene.contentLines.join("\n"),
       });
     }
 

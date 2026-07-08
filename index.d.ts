@@ -1,4 +1,4 @@
-// TypeScript types for flow-prompt-studio v2.6
+// TypeScript types for flow-prompt-studio v3.0
 // Minimum TypeScript version: 4.5+
 
 /* ─── Screenplay Parser ─── */
@@ -11,6 +11,7 @@ export interface SceneResult {
   lineNumber: number;
   dialogueCount: number;
   characters: string[];
+  content: string;
 }
 
 export interface CharacterResult {
@@ -100,6 +101,127 @@ export class FileExporter {
   /** @internal */ static _shotPlanToHtml(result: CoverageResult): string;
   /** @internal */ static _ensureDir(dir: string): void;
   /** @internal */ static _writeFile(filePath: string, content: string): string;
+}
+
+/* ─── Google Flow / Veo Production Pack ─── */
+
+export type ProductionPackMode = "standard" | "director";
+export type VeoDuration = 4 | 6 | 8;
+
+export interface ProductionPackOptions {
+  title?: string;
+  mode?: ProductionPackMode;
+  shotsPerScene?: number | string;
+  defaultDuration?: VeoDuration | number | string;
+  learning?: ProductionLearning;
+  learningPath?: string;
+  projectDir?: string;
+}
+
+export interface ProductionFeedbackEntry {
+  id: string;
+  type: "approved" | "rejected";
+  scope: string;
+  shot: string | null;
+  note: string;
+  tags: string[];
+  createdAt: string | null;
+}
+
+export interface ProductionLearning {
+  version: number;
+  approved: ProductionFeedbackEntry[];
+  rejected: ProductionFeedbackEntry[];
+  updatedAt: string | null;
+}
+
+export interface ProductionFeedbackInput {
+  type: "approved" | "rejected";
+  note: string;
+  shot?: string | null;
+  scope?: string;
+  tags?: string[] | string;
+  id?: string;
+  createdAt?: string;
+}
+
+export interface ProductionShot {
+  number: number;
+  sceneNumber: string;
+  sceneHeading: string;
+  sceneLocation: string;
+  sceneShotIndex: number;
+  sceneShotCount: number;
+  durationSeconds: VeoDuration;
+  intent: string;
+  mode: ProductionPackMode;
+  risks: string[];
+  references: string[];
+  flowToolAdvice: string;
+  productionDetails: Record<string, string>;
+  startImagePrompt: string;
+  endImagePrompt: string;
+  videoPrompt: string;
+  qualityChecklist: string[];
+}
+
+export interface ProductionPack {
+  title: string;
+  slug: string;
+  mode: ProductionPackMode;
+  platform: string;
+  validDurations: VeoDuration[];
+  source: string;
+  sceneCount: number;
+  shotCount: number;
+  continuity: {
+    characters: string[];
+    locations: string[];
+    visualRules: string[];
+    approvedDirections: ProductionFeedbackEntry[];
+    rejectedDirections: ProductionFeedbackEntry[];
+  };
+  learning: ProductionLearning;
+  shots: ProductionShot[];
+}
+
+export interface ExportedProductionPack extends ProductionPack {
+  outputDir: string;
+  files: string[];
+}
+
+export class ProductionPackGenerator {
+  static readonly validDurations: VeoDuration[];
+  static create(parseResult: ParseResult, options?: ProductionPackOptions): ProductionPack;
+  static export(parseResult: ParseResult, outputDir: string, options?: ProductionPackOptions): ExportedProductionPack;
+  static loadLearning(inputPath?: string): ProductionLearning;
+  static recordFeedback(projectDir: string, feedback: ProductionFeedbackInput): { learningPath: string; learning: ProductionLearning; entry: ProductionFeedbackEntry };
+  static toIndexMarkdown(pack: ProductionPack): string;
+  static toContinuityMarkdown(pack: ProductionPack): string;
+  static toLearningMarkdown(learning: ProductionLearning, pack?: Partial<ProductionPack>): string;
+  static toShotMarkdown(shot: ProductionShot, pack: ProductionPack): string;
+}
+
+/* ─── Source Ingest ─── */
+
+export interface IngestOptions {
+  title?: string;
+  pdftotextPath?: string;
+}
+
+export interface IngestResult {
+  title: string;
+  source: string;
+  outputDir: string;
+  normalizedPath: string;
+  manual: boolean;
+  parseResult: ParseResult | null;
+  files: string[];
+  message?: string;
+}
+
+export class IngestHelper {
+  static ingest(filePath: string, outputDir?: string, options?: IngestOptions): IngestResult;
 }
 
 /* ─── AI Prompt Generation ─── */
@@ -263,6 +385,11 @@ export interface FpsAPI {
   getGenre(genre: string): GenreInfo;
   exportParseResult(result: ParseResult, format: string, outputDir: string): string;
   exportShotPlan(result: CoverageResult, format: string, outputDir: string): string;
+  createProductionPack(result: ParseResult, options?: ProductionPackOptions): ProductionPack;
+  exportProductionPack(result: ParseResult, outputDir: string, options?: ProductionPackOptions): ExportedProductionPack;
+  recordProductionFeedback(projectDir: string, feedback: ProductionFeedbackInput): { learningPath: string; learning: ProductionLearning; entry: ProductionFeedbackEntry };
+  loadProductionLearning(inputPath?: string): ProductionLearning;
+  ingest(filePath: string, outputDir?: string, options?: IngestOptions): IngestResult;
   toMarkdown(result: CoverageResult): string;
   toCSV(result: CoverageResult): string;
   toStdout(data: any): void;
@@ -276,6 +403,7 @@ export interface FpsAPI {
 }
 
 export const fps: FpsAPI;
+export const version: string;
 
 /* ─── Backend (optional) ─── */
 
@@ -345,6 +473,11 @@ export class FlowPromptStudio {
   getGenre(genre: string): GenreInfo;
   exportParseResult(result: ParseResult, format: string, outputDir: string): string;
   exportShotPlan(result: CoverageResult, format: string, outputDir: string): string;
+  createProductionPack(result: ParseResult, options?: ProductionPackOptions): ProductionPack;
+  exportProductionPack(result: ParseResult, outputDir: string, options?: ProductionPackOptions): ExportedProductionPack;
+  recordProductionFeedback(projectDir: string, feedback: ProductionFeedbackInput): { learningPath: string; learning: ProductionLearning; entry: ProductionFeedbackEntry };
+  loadProductionLearning(inputPath?: string): ProductionLearning;
+  ingest(filePath: string, outputDir?: string, options?: IngestOptions): IngestResult;
   shotPlanToMarkdown(result: CoverageResult): string;
   shotPlanToCSV(result: CoverageResult): string;
   shotPlanToHTML(result: CoverageResult): string;
